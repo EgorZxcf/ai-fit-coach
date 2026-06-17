@@ -1,5 +1,5 @@
 // Путь в репозитории: mobile/lib/main.dart
-// Полностью заменяет предыдущий main.dart — экран чата теперь рабочий, на моковых ответах.
+// Добавлен экран онбординга (стартовый экран) + IndexedStack, чтобы вкладки не сбрасывались.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -19,10 +19,169 @@ class AiFitCoachApp extends StatelessWidget {
         colorSchemeSeed: Colors.teal,
         useMaterial3: true,
       ),
-      home: const RootScreen(),
+      home: const OnboardingScreen(),
     );
   }
 }
+
+// ---------- ОНБОРДИНГ ----------
+
+class OnboardingScreen extends StatefulWidget {
+  const OnboardingScreen({super.key});
+
+  @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  final List<Map<String, String>> _goals = const [
+    {'value': 'weight_loss', 'label': 'Снижение веса'},
+    {'value': 'muscle_gain', 'label': 'Набор массы'},
+    {'value': 'endurance', 'label': 'Выносливость'},
+  ];
+
+  final List<Map<String, String>> _levels = const [
+    {'value': 'beginner', 'label': 'Новичок'},
+    {'value': 'intermediate', 'label': 'Средний'},
+    {'value': 'advanced', 'label': 'Продвинутый'},
+  ];
+
+  final List<Map<String, String>> _equipmentOptions = const [
+    {'value': 'dumbbells', 'label': 'Гантели'},
+    {'value': 'barbell', 'label': 'Штанга'},
+    {'value': 'resistance_bands', 'label': 'Резинки'},
+    {'value': 'pull_up_bar', 'label': 'Турник'},
+    {'value': 'none', 'label': 'Без оборудования'},
+  ];
+
+  String? _selectedGoal;
+  String? _selectedLevel;
+  final Set<String> _selectedEquipment = {};
+  final TextEditingController _restrictionsController = TextEditingController();
+
+  bool get _canContinue => _selectedGoal != null && _selectedLevel != null;
+
+  void _submit() {
+    final data = {
+      'goal': _selectedGoal,
+      'level': _selectedLevel,
+      'equipment': _selectedEquipment.toList(),
+      'restrictions': _restrictionsController.text.trim(),
+    };
+
+    // TODO: отправить data на POST /users/onboarding, когда бэкенд будет готов.
+    debugPrint('Onboarding data: $data');
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const RootScreen()),
+    );
+  }
+
+  @override
+  void dispose() {
+    _restrictionsController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildSectionTitle(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+    );
+  }
+
+  Widget _buildChoiceChips({
+    required List<Map<String, String>> options,
+    required String? selectedValue,
+    required void Function(String value) onSelected,
+  }) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: options.map((opt) {
+        final isSelected = selectedValue == opt['value'];
+        return ChoiceChip(
+          label: Text(opt['label']!),
+          selected: isSelected,
+          onSelected: (_) => onSelected(opt['value']!),
+        );
+      }).toList(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Расскажи о себе')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Это поможет AI-тренеру составить план именно под тебя.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            _buildSectionTitle('Цель'),
+            _buildChoiceChips(
+              options: _goals,
+              selectedValue: _selectedGoal,
+              onSelected: (v) => setState(() => _selectedGoal = v),
+            ),
+            _buildSectionTitle('Уровень подготовки'),
+            _buildChoiceChips(
+              options: _levels,
+              selectedValue: _selectedLevel,
+              onSelected: (v) => setState(() => _selectedLevel = v),
+            ),
+            _buildSectionTitle('Доступное оборудование'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: _equipmentOptions.map((opt) {
+                final isSelected = _selectedEquipment.contains(opt['value']);
+                return FilterChip(
+                  label: Text(opt['label']!),
+                  selected: isSelected,
+                  onSelected: (val) {
+                    setState(() {
+                      if (val) {
+                        _selectedEquipment.add(opt['value']!);
+                      } else {
+                        _selectedEquipment.remove(opt['value']!);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            _buildSectionTitle('Есть ограничения по здоровью? (необязательно)'),
+            TextField(
+              controller: _restrictionsController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'Например: болит колено',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _canContinue ? _submit : null,
+                child: const Text('Продолжить'),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- ОСНОВНОЕ ПРИЛОЖЕНИЕ ----------
 
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key});
@@ -44,7 +203,10 @@ class _RootScreenState extends State<RootScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
