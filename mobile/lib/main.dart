@@ -1,6 +1,7 @@
 // Путь в репозитории: mobile/lib/main.dart
-// Заменить стандартный файл, который создаст `flutter create`, этим содержимым.
+// Полностью заменяет предыдущий main.dart — экран чата теперь рабочий, на моковых ответах.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -70,14 +71,123 @@ class PlanScreen extends StatelessWidget {
   }
 }
 
-class ChatScreen extends StatelessWidget {
+class ChatMessage {
+  final String role; // 'user' или 'assistant'
+  final String text;
+  ChatMessage(this.role, this.text);
+}
+
+class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final List<ChatMessage> _messages = [
+    ChatMessage(
+      'assistant',
+      'Привет! Я твой AI-тренер. Расскажи, как прошла тренировка, или задай вопрос.',
+    ),
+  ];
+  final TextEditingController _controller = TextEditingController();
+  bool _isWaiting = false;
+
+  void _sendMessage() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _messages.add(ChatMessage('user', text));
+      _isWaiting = true;
+    });
+    _controller.clear();
+
+    // Заглушка вместо реального запроса к /chat/message.
+    // Когда бэкенд готов — замени этот блок на:
+    // final res = await apiClient.sendChatMessage(text);
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage(
+          'assistant',
+          'Это тестовый ответ. Скоро здесь будет настоящий AI-тренер.',
+        ));
+        _isWaiting = false;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('AI-тренер')),
-      body: const Center(child: Text('TODO: подключить POST /chat/message')),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final msg = _messages[index];
+                final isUser = msg.role == 'user';
+                return Align(
+                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isUser
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(msg.text),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (_isWaiting)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text('тренер пишет...', style: TextStyle(color: Colors.grey)),
+            ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: const InputDecoration(
+                        hintText: 'Напиши тренеру...',
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: _sendMessage,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
