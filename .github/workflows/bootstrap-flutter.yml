@@ -1,0 +1,38 @@
+# Путь в репозитории: .github/workflows/bootstrap-flutter.yml
+# Запускается ВРУЧНУЮ один раз (Actions -> Bootstrap Flutter Project -> Run workflow),
+# создаёт папку mobile/ с рабочим Flutter-проектом и пушит её в репозиторий.
+# После этого файл можно удалить или оставить — повторный запуск ничего не сломает.
+
+name: Bootstrap Flutter Project
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+          channel: 'stable'
+
+      - name: Создать Flutter-проект, если его ещё нет
+        run: |
+          if [ ! -f mobile/pubspec.yaml ]; then
+            flutter create --org com.aifitcoach --project-name ai_fit_coach mobile
+          else
+            echo "mobile/ уже существует, пропускаю"
+          fi
+
+      - name: Закоммитить и запушить
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add mobile
+          git diff --cached --quiet || git commit -m "Bootstrap Flutter project scaffold"
+          git push

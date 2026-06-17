@@ -1,0 +1,36 @@
+# Путь в репозитории: .github/workflows/build-apk.yml
+# Собирает APK при каждом пуше в main, готовый файл лежит в Artifacts запуска workflow.
+
+name: Build APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+          channel: 'stable'
+
+      - name: Установить зависимости
+        run: flutter pub get
+
+      - name: Собрать APK
+        run: flutter build apk --release
+
+      - name: Загрузить APK как артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
