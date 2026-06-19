@@ -270,7 +270,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       onTap: () => setState(() => _selectedLevel = l['value']),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: l['value'] != 'advanced' ? 8 : 0),
+                        margin:  EdgeInsets.only(right: l['value'] != 'advanced' ? 8 : 0),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
                           color: selected ? AppTheme.primary.withOpacity(0.12) : AppTheme.surfaceCard,
