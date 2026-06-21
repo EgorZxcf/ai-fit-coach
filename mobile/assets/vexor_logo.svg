@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Фон с закруглёнными углами -->
+  <rect width="1024" height="1024" rx="224" fill="#00C896"/>
+  <!-- Градиент поверх фона -->
+  <rect width="1024" height="1024" rx="224" fill="url(#grad)" opacity="0.3"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00C896;stop-opacity:0" />
+    </linearGradient>
+  </defs>
+  <!-- Буква V — жирная, по центру -->
+  <text x="512" y="780"
+    text-anchor="middle"
+    font-family="Arial Black, Impact, sans-serif"
+    font-weight="900"
+    font-size="720"
+    fill="#000000"
+    opacity="0.9">V</text>
+  <!-- Молния поверх нижней точки V -->
+  <polygon points="530,580 490,680 520,680 490,780 570,650 535,650 565,580"
+    fill="#ffffff" opacity="0.85"/>
+</svg>
