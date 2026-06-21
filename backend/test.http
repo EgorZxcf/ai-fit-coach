@@ -1,0 +1,21 @@
+GET http://127.0.0.1:8000/
+
+###
+
+POST http://127.0.0.1:8000/register
+Content-Type: application/json
+
+{
+    "email": "test@gmail.com",
+    "password": "super_secret_password123"
+}
+
+###
+
+POST http://127.0.0.1:8000/login
+Content-Type: application/json
+
+{
+    "email": "test@gmail.com",
+    "password": "super_secret_password1234"
+}
