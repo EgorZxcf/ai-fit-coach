@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="ai_fit_coach"
+        android:label="Vexor"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

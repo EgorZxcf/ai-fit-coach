@@ -1,8 +1,10 @@
 // Путь в репозитории: mobile/lib/main.dart
+// Изменения: переименовано в Vexor, добавлен логотип, shared_preferences для онбординга
 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,7 +12,7 @@ void main() {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
-  runApp(const AiFitCoachApp());
+  runApp(const VexorApp());
 }
 
 // ---------- ТЕМА ----------
@@ -90,16 +92,59 @@ class AppTheme {
       );
 }
 
-class AiFitCoachApp extends StatelessWidget {
-  const AiFitCoachApp({super.key});
+// ---------- ЛОГОТИП VEXOR ----------
+
+class VexorLogo extends StatelessWidget {
+  final double size;
+  const VexorLogo({super.key, this.size = 72});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppTheme.primary, AppTheme.primaryDark],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(size * 0.22),
+        boxShadow: [
+          BoxShadow(color: AppTheme.primary.withOpacity(0.4), blurRadius: size * 0.35, offset: Offset(0, size * 0.12)),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Буква V
+          Text('V', style: TextStyle(
+            color: Colors.black,
+            fontSize: size * 0.58,
+            fontWeight: FontWeight.w900,
+            height: 1.15,
+            letterSpacing: -1,
+          )),
+          // Молния поверх нижней части V
+          Positioned(
+            bottom: size * 0.12,
+            right: size * 0.18,
+            child: Icon(Icons.bolt, color: Colors.white.withOpacity(0.75), size: size * 0.28),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class VexorApp extends StatelessWidget {
+  const VexorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AI Fit Coach',
+      title: 'Vexor',
       theme: AppTheme.dark,
       debugShowCheckedModeBanner: false,
-      home: const AuthScreen(), // Теперь стартовый экран — авторизация
+      home: const AuthScreen(),
     );
   }
 }
@@ -146,28 +191,30 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   bool _isValidEmail(String email) => RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
 
+  Future<void> _navigateAfterAuth() async {
+    // Проверяем, проходил ли пользователь онбординг
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+    if (!mounted) return;
+    if (onboardingDone) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RootScreen()));
+    } else {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+    }
+  }
+
   Future<void> _login() async {
     setState(() => _errorMessage = null);
     final email = _loginEmailController.text.trim();
     final password = _loginPasswordController.text;
-
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Заполни все поля');
-      return;
-    }
-    if (!_isValidEmail(email)) {
-      setState(() => _errorMessage = 'Некорректный email');
-      return;
-    }
-
+    if (email.isEmpty || password.isEmpty) { setState(() => _errorMessage = 'Заполни все поля'); return; }
+    if (!_isValidEmail(email)) { setState(() => _errorMessage = 'Некорректный email'); return; }
     setState(() => _isLoading = true);
-    // TODO: заменить на реальный запрос POST /auth/login когда бэкенд готов:
-    // final res = await apiClient.login(email, password);
+    // TODO: заменить на POST /auth/login
     await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
     setState(() => _isLoading = false);
-
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+    await _navigateAfterAuth();
   }
 
   Future<void> _register() async {
@@ -175,58 +222,33 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     final email = _regEmailController.text.trim();
     final password = _regPasswordController.text;
     final confirm = _regPasswordConfirmController.text;
-
-    if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
-      setState(() => _errorMessage = 'Заполни все поля');
-      return;
-    }
-    if (!_isValidEmail(email)) {
-      setState(() => _errorMessage = 'Некорректный email');
-      return;
-    }
-    if (password.length < 6) {
-      setState(() => _errorMessage = 'Пароль минимум 6 символов');
-      return;
-    }
-    if (password != confirm) {
-      setState(() => _errorMessage = 'Пароли не совпадают');
-      return;
-    }
-
+    if (email.isEmpty || password.isEmpty || confirm.isEmpty) { setState(() => _errorMessage = 'Заполни все поля'); return; }
+    if (!_isValidEmail(email)) { setState(() => _errorMessage = 'Некорректный email'); return; }
+    if (password.length < 6) { setState(() => _errorMessage = 'Пароль минимум 6 символов'); return; }
+    if (password != confirm) { setState(() => _errorMessage = 'Пароли не совпадают'); return; }
     setState(() => _isLoading = true);
-    // TODO: заменить на реальный запрос POST /auth/register когда бэкенд готов:
-    // final res = await apiClient.register(email, password);
+    // TODO: заменить на POST /auth/register
     await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
     setState(() => _isLoading = false);
-
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OnboardingScreen()));
+    await _navigateAfterAuth();
   }
 
   Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-    bool passwordVisible = false,
-    VoidCallback? onTogglePassword,
+    required TextEditingController controller, required String hint, required IconData icon,
+    bool isPassword = false, bool passwordVisible = false, VoidCallback? onTogglePassword,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return TextField(
-      controller: controller,
-      obscureText: isPassword && !passwordVisible,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: AppTheme.textPrimary),
+      controller: controller, obscureText: isPassword && !passwordVisible,
+      keyboardType: keyboardType, style: const TextStyle(color: AppTheme.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: Icon(icon, color: AppTheme.textSecondary, size: 20),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(passwordVisible ? Icons.visibility_off : Icons.visibility,
-                  color: AppTheme.textSecondary, size: 20),
-                onPressed: onTogglePassword,
-              )
-            : null,
+        suffixIcon: isPassword ? IconButton(
+          icon: Icon(passwordVisible ? Icons.visibility_off : Icons.visibility, color: AppTheme.textSecondary, size: 20),
+          onPressed: onTogglePassword,
+        ) : null,
       ),
     );
   }
@@ -241,31 +263,16 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 24),
-              // Логотип
               Center(
-                child: Column(
-                  children: [
-                    Container(
-                      width: 72, height: 72,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppTheme.primary, AppTheme.primaryDark],
-                          begin: Alignment.topLeft, end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))],
-                      ),
-                      child: const Icon(Icons.fitness_center, color: Colors.black, size: 36),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('AI Fit Coach', style: TextStyle(color: AppTheme.textPrimary, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-                    const SizedBox(height: 6),
-                    const Text('Твой персональный AI-тренер', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
-                  ],
-                ),
+                child: Column(children: [
+                  const VexorLogo(size: 80),
+                  const SizedBox(height: 16),
+                  const Text('Vexor', style: TextStyle(color: AppTheme.textPrimary, fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                  const SizedBox(height: 6),
+                  const Text('Твой персональный AI-тренер', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+                ]),
               ),
               const SizedBox(height: 36),
-              // Вкладки
               Container(
                 decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14)),
                 child: TabBar(
@@ -280,104 +287,45 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 ),
               ),
               const SizedBox(height: 24),
-              // Ошибка
               if (_errorMessage != null)
                 Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.danger.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: AppTheme.danger, size: 18),
-                      const SizedBox(width: 8),
-                      Text(_errorMessage!, style: const TextStyle(color: AppTheme.danger, fontSize: 13)),
-                    ],
-                  ),
+                  decoration: BoxDecoration(color: AppTheme.danger.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.danger.withOpacity(0.3))),
+                  child: Row(children: [
+                    const Icon(Icons.error_outline, color: AppTheme.danger, size: 18),
+                    const SizedBox(width: 8),
+                    Text(_errorMessage!, style: const TextStyle(color: AppTheme.danger, fontSize: 13)),
+                  ]),
                 ),
-              // Форма
               SizedBox(
                 height: 320,
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    // Вход
-                    Column(
-                      children: [
-                        _buildTextField(
-                          controller: _loginEmailController,
-                          hint: 'Email',
-                          icon: Icons.email_outlined,
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _loginPasswordController,
-                          hint: 'Пароль',
-                          icon: Icons.lock_outline,
-                          isPassword: true,
-                          passwordVisible: _loginPasswordVisible,
-                          onTogglePassword: () => setState(() => _loginPasswordVisible = !_loginPasswordVisible),
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {},
-                            child: const Text('Забыл пароль?', style: TextStyle(color: AppTheme.primary, fontSize: 13)),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        _isLoading
-                            ? const CircularProgressIndicator(color: AppTheme.primary)
-                            : FilledButton(onPressed: _login, child: const Text('Войти')),
-                      ],
-                    ),
-                    // Регистрация
-                    Column(
-                      children: [
-                        _buildTextField(
-                          controller: _regEmailController,
-                          hint: 'Email',
-                          icon: Icons.email_outlined,
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _regPasswordController,
-                          hint: 'Пароль (минимум 6 символов)',
-                          icon: Icons.lock_outline,
-                          isPassword: true,
-                          passwordVisible: _regPasswordVisible,
-                          onTogglePassword: () => setState(() => _regPasswordVisible = !_regPasswordVisible),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _regPasswordConfirmController,
-                          hint: 'Повтори пароль',
-                          icon: Icons.lock_outline,
-                          isPassword: true,
-                          passwordVisible: _regPasswordConfirmVisible,
-                          onTogglePassword: () => setState(() => _regPasswordConfirmVisible = !_regPasswordConfirmVisible),
-                        ),
-                        const SizedBox(height: 16),
-                        _isLoading
-                            ? const CircularProgressIndicator(color: AppTheme.primary)
-                            : FilledButton(onPressed: _register, child: const Text('Создать аккаунт')),
-                      ],
-                    ),
+                    Column(children: [
+                      _buildTextField(controller: _loginEmailController, hint: 'Email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+                      const SizedBox(height: 12),
+                      _buildTextField(controller: _loginPasswordController, hint: 'Пароль', icon: Icons.lock_outline, isPassword: true, passwordVisible: _loginPasswordVisible, onTogglePassword: () => setState(() => _loginPasswordVisible = !_loginPasswordVisible)),
+                      const SizedBox(height: 8),
+                      Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () {}, child: const Text('Забыл пароль?', style: TextStyle(color: AppTheme.primary, fontSize: 13)))),
+                      const SizedBox(height: 8),
+                      _isLoading ? const CircularProgressIndicator(color: AppTheme.primary) : FilledButton(onPressed: _login, child: const Text('Войти')),
+                    ]),
+                    Column(children: [
+                      _buildTextField(controller: _regEmailController, hint: 'Email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+                      const SizedBox(height: 12),
+                      _buildTextField(controller: _regPasswordController, hint: 'Пароль (минимум 6 символов)', icon: Icons.lock_outline, isPassword: true, passwordVisible: _regPasswordVisible, onTogglePassword: () => setState(() => _regPasswordVisible = !_regPasswordVisible)),
+                      const SizedBox(height: 12),
+                      _buildTextField(controller: _regPasswordConfirmController, hint: 'Повтори пароль', icon: Icons.lock_outline, isPassword: true, passwordVisible: _regPasswordConfirmVisible, onTogglePassword: () => setState(() => _regPasswordConfirmVisible = !_regPasswordConfirmVisible)),
+                      const SizedBox(height: 16),
+                      _isLoading ? const CircularProgressIndicator(color: AppTheme.primary) : FilledButton(onPressed: _register, child: const Text('Создать аккаунт')),
+                    ]),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-              Center(
-                child: Text('Нажимая кнопку, ты соглашаешься с условиями использования.\nПриложение не заменяет консультацию врача.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11, height: 1.6)),
-              ),
+              const Center(child: Text('Нажимая кнопку, ты соглашаешься с условиями использования.\nПриложение не заменяет консультацию врача.', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, height: 1.6))),
             ],
           ),
         ),
@@ -418,12 +366,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String? _selectedLevel;
   final Set<String> _selectedEquipment = {};
   final TextEditingController _restrictionsController = TextEditingController();
+  bool _isSaving = false;
+
   bool get _canContinue => _selectedGoal != null && _selectedLevel != null;
 
   @override
   void dispose() {
     _restrictionsController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() => _isSaving = true);
+    // Сохраняем данные онбординга
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_done', true);
+    await prefs.setString('goal', _selectedGoal!);
+    await prefs.setString('level', _selectedLevel!);
+    await prefs.setStringList('equipment', _selectedEquipment.toList());
+    await prefs.setString('restrictions', _restrictionsController.text.trim());
+    // TODO: отправить на POST /users/onboarding когда бэкенд готов
+    if (!mounted) return;
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RootScreen()));
   }
 
   Widget _section(String title) => Padding(
@@ -448,23 +412,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48, height: 48,
-                      decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.2), borderRadius: BorderRadius.circular(14)),
-                      child: const Icon(Icons.fitness_center, color: AppTheme.primary, size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('AI Fit Coach', style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
-                        Text('Настроим план под тебя', style: Theme.of(context).textTheme.bodySmall),
-                      ],
-                    )),
-                  ],
-                ),
+                child: Row(children: [
+                  const VexorLogo(size: 48),
+                  const SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Vexor', style: TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text('Настроим план под тебя', style: Theme.of(context).textTheme.bodySmall),
+                  ])),
+                ]),
               ),
               _section('Цель'),
               Column(
@@ -526,10 +481,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               _section('Ограничения (необязательно)'),
               TextField(controller: _restrictionsController, maxLines: 2, style: const TextStyle(color: AppTheme.textPrimary), decoration: const InputDecoration(hintText: 'Например: болит колено')),
               const SizedBox(height: 28),
-              FilledButton(
-                onPressed: _canContinue ? () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RootScreen())) : null,
-                child: const Text('Начать тренировки'),
-              ),
+              _isSaving
+                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                  : FilledButton(onPressed: _canContinue ? _submit : null, child: const Text('Начать тренировки')),
               const SizedBox(height: 16),
             ],
           ),
@@ -572,19 +526,12 @@ class _RootScreenState extends State<RootScreen> {
 // ---------- ПЛАН ----------
 
 class Exercise {
-  final String name;
-  final String sets;
-  final String muscles;
-  final IconData icon;
-  bool done;
+  final String name; final String sets; final String muscles; final IconData icon; bool done;
   Exercise({required this.name, required this.sets, required this.muscles, required this.icon, this.done = false});
 }
 
 class WorkoutDay {
-  final String day;
-  final String label;
-  final String type;
-  final List<Exercise> exercises;
+  final String day; final String label; final String type; final List<Exercise> exercises;
   WorkoutDay({required this.day, required this.label, required this.type, required this.exercises});
 }
 
@@ -644,135 +591,84 @@ class _PlanScreenState extends State<PlanScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('План'),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.primary.withOpacity(0.3))),
-            child: const Text('Моковый план', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w600)),
-          ),
-        ],
+        actions: [Container(margin: const EdgeInsets.only(right: 16), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.primary.withOpacity(0.3))), child: const Text('Моковый план', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w600)))],
       ),
-      body: Column(
-        children: [
-          Container(
-            height: 72, color: AppTheme.background,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _plan.length,
-              itemBuilder: (context, i) {
-                final d = _plan[i];
-                final selected = _selectedDay == i;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedDay = i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 8),
-                    width: 52,
-                    decoration: BoxDecoration(
-                      color: selected ? AppTheme.primary : AppTheme.surfaceCard,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: selected ? AppTheme.primary : const Color(0xFF2E3247)),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(d.day, style: TextStyle(color: selected ? Colors.black : AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
-                        const SizedBox(height: 4),
-                        Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: selected ? Colors.black.withOpacity(0.4) : d.exercises.isNotEmpty ? AppTheme.primary : AppTheme.textSecondary.withOpacity(0.3))),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+      body: Column(children: [
+        Container(height: 72, color: AppTheme.background,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: _plan.length,
+            itemBuilder: (context, i) {
+              final d = _plan[i]; final selected = _selectedDay == i;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedDay = i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(right: 8), width: 52,
+                  decoration: BoxDecoration(color: selected ? AppTheme.primary : AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: selected ? AppTheme.primary : const Color(0xFF2E3247))),
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Text(d.day, style: TextStyle(color: selected ? Colors.black : AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
+                    const SizedBox(height: 4),
+                    Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: selected ? Colors.black.withOpacity(0.4) : d.exercises.isNotEmpty ? AppTheme.primary : AppTheme.textSecondary.withOpacity(0.3))),
+                  ]),
+                ),
+              );
+            },
           ),
-          Expanded(
-            child: isRest
-                ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    const Text('😴', style: TextStyle(fontSize: 52)),
-                    const SizedBox(height: 16),
-                    const Text('День отдыха', style: TextStyle(color: AppTheme.textPrimary, fontSize: 20, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 8),
-                    Text('${today.label} — восстановление', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
-                  ]))
-                : ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(colors: [AppTheme.primary.withOpacity(0.15), AppTheme.surfaceCard], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-                        ),
-                        child: Row(children: [
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(today.label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                            const SizedBox(height: 4),
-                            Text(today.type, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 8),
-                            Text('${today.exercises.length} упражнений', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
-                          ])),
-                          Stack(alignment: Alignment.center, children: [
-                            SizedBox(width: 52, height: 52, child: CircularProgressIndicator(
-                              value: today.exercises.isEmpty ? 0 : doneCount / today.exercises.length,
-                              backgroundColor: AppTheme.surface, color: AppTheme.primary, strokeWidth: 4,
-                            )),
-                            Text('$doneCount/${today.exercises.length}', style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontWeight: FontWeight.w700)),
-                          ]),
-                        ]),
-                      ),
-                      const SizedBox(height: 16),
-                      ...today.exercises.map((ex) => GestureDetector(
-                        onTap: () => setState(() => ex.done = !ex.done),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: ex.done ? AppTheme.primary.withOpacity(0.1) : AppTheme.surfaceCard,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: ex.done ? AppTheme.primary.withOpacity(0.4) : const Color(0xFF2E3247)),
-                          ),
-                          child: Row(children: [
-                            Container(
-                              width: 40, height: 40,
-                              decoration: BoxDecoration(color: ex.done ? AppTheme.primary : AppTheme.surface, borderRadius: BorderRadius.circular(10)),
-                              child: Icon(ex.done ? Icons.check : ex.icon, color: ex.done ? Colors.black : AppTheme.textSecondary, size: 20),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(ex.name, style: TextStyle(color: ex.done ? AppTheme.primary : AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14, decoration: ex.done ? TextDecoration.lineThrough : null, decorationColor: AppTheme.primary)),
-                              const SizedBox(height: 2),
-                              Text(ex.muscles, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                            ])),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(8)),
-                              child: Text(ex.sets, style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700)),
-                            ),
-                          ]),
-                        ),
-                      )),
-                      const SizedBox(height: 80),
-                    ],
-                  ),
-          ),
-        ],
-      ),
+        ),
+        Expanded(child: isRest
+          ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Text('😴', style: TextStyle(fontSize: 52)), const SizedBox(height: 16),
+              const Text('День отдыха', style: TextStyle(color: AppTheme.textPrimary, fontSize: 20, fontWeight: FontWeight.w700)), const SizedBox(height: 8),
+              Text('${today.label} — восстановление', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+            ]))
+          : ListView(padding: const EdgeInsets.all(16), children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(gradient: LinearGradient(colors: [AppTheme.primary.withOpacity(0.15), AppTheme.surfaceCard], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.primary.withOpacity(0.2))),
+                child: Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(today.label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)), const SizedBox(height: 4),
+                    Text(today.type, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)), const SizedBox(height: 8),
+                    Text('${today.exercises.length} упражнений', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                  ])),
+                  Stack(alignment: Alignment.center, children: [
+                    SizedBox(width: 52, height: 52, child: CircularProgressIndicator(value: today.exercises.isEmpty ? 0 : doneCount / today.exercises.length, backgroundColor: AppTheme.surface, color: AppTheme.primary, strokeWidth: 4)),
+                    Text('$doneCount/${today.exercises.length}', style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ]),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              ...today.exercises.map((ex) => GestureDetector(
+                onTap: () => setState(() => ex.done = !ex.done),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: ex.done ? AppTheme.primary.withOpacity(0.1) : AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: ex.done ? AppTheme.primary.withOpacity(0.4) : const Color(0xFF2E3247))),
+                  child: Row(children: [
+                    Container(width: 40, height: 40, decoration: BoxDecoration(color: ex.done ? AppTheme.primary : AppTheme.surface, borderRadius: BorderRadius.circular(10)), child: Icon(ex.done ? Icons.check : ex.icon, color: ex.done ? Colors.black : AppTheme.textSecondary, size: 20)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(ex.name, style: TextStyle(color: ex.done ? AppTheme.primary : AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14, decoration: ex.done ? TextDecoration.lineThrough : null, decorationColor: AppTheme.primary)),
+                      const SizedBox(height: 2),
+                      Text(ex.muscles, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                    ])),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(8)), child: Text(ex.sets, style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700))),
+                  ]),
+                ),
+              )),
+              const SizedBox(height: 80),
+            ]),
+        ),
+      ]),
     );
   }
 }
 
 // ---------- ЧАТ ----------
 
-class ChatMessage {
-  final String role;
-  final String text;
-  ChatMessage(this.role, this.text);
-}
+class ChatMessage { final String role; final String text; ChatMessage(this.role, this.text); }
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -781,32 +677,17 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final List<ChatMessage> _messages = [
-    ChatMessage('assistant', 'Привет! Я твой AI-тренер 💪\nРасскажи, как прошла тренировка, или задай вопрос.'),
-  ];
+  final List<ChatMessage> _messages = [ChatMessage('assistant', 'Привет! Я твой AI-тренер 💪\nРасскажи, как прошла тренировка, или задай вопрос.')];
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isWaiting = false;
 
-  void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-      }
-    });
-  }
+  void _scrollToBottom() { Future.delayed(const Duration(milliseconds: 100), () { if (_scrollController.hasClients) _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut); }); }
 
   void _sendMessage() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    setState(() { _messages.add(ChatMessage('user', text)); _isWaiting = true; });
-    _controller.clear();
-    _scrollToBottom();
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted) return;
-      setState(() { _messages.add(ChatMessage('assistant', 'Это тестовый ответ. Скоро здесь будет настоящий AI-тренер 🤖')); _isWaiting = false; });
-      _scrollToBottom();
-    });
+    final text = _controller.text.trim(); if (text.isEmpty) return;
+    setState(() { _messages.add(ChatMessage('user', text)); _isWaiting = true; }); _controller.clear(); _scrollToBottom();
+    Future.delayed(const Duration(milliseconds: 800), () { if (!mounted) return; setState(() { _messages.add(ChatMessage('assistant', 'Это тестовый ответ. Скоро здесь будет настоящий AI-тренер 🤖')); _isWaiting = false; }); _scrollToBottom(); });
   }
 
   @override
@@ -815,51 +696,35 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(children: [
-          Container(width: 36, height: 36, decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.smart_toy_outlined, color: AppTheme.primary, size: 20)),
-          const SizedBox(width: 10),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('AI-тренер', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-            Text(_isWaiting ? 'пишет...' : 'онлайн', style: TextStyle(fontSize: 11, color: _isWaiting ? AppTheme.warning : AppTheme.primary)),
-          ]),
+      appBar: AppBar(title: Row(children: [
+        Container(width: 36, height: 36, decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.smart_toy_outlined, color: AppTheme.primary, size: 20)),
+        const SizedBox(width: 10),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Vexor AI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+          Text(_isWaiting ? 'пишет...' : 'онлайн', style: TextStyle(fontSize: 11, color: _isWaiting ? AppTheme.warning : AppTheme.primary)),
         ]),
-      ),
+      ])),
       body: Column(children: [
         Expanded(child: ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(16),
-          itemCount: _messages.length,
+          controller: _scrollController, padding: const EdgeInsets.all(16), itemCount: _messages.length,
           itemBuilder: (context, index) {
-            final msg = _messages[index];
-            final isUser = msg.role == 'user';
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (!isUser) ...[
-                    Container(width: 28, height: 28, decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.smart_toy_outlined, color: AppTheme.primary, size: 16)),
-                    const SizedBox(width: 8),
-                  ],
-                  Flexible(child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isUser ? AppTheme.primary : AppTheme.surfaceCard,
-                      borderRadius: BorderRadius.only(topLeft: const Radius.circular(16), topRight: const Radius.circular(16), bottomLeft: Radius.circular(isUser ? 16 : 4), bottomRight: Radius.circular(isUser ? 4 : 16)),
-                    ),
-                    child: Text(msg.text, style: TextStyle(color: isUser ? Colors.black : AppTheme.textPrimary, fontSize: 14, height: 1.4)),
-                  )),
-                  if (isUser) const SizedBox(width: 4),
-                ],
-              ),
-            );
+            final msg = _messages[index]; final isUser = msg.role == 'user';
+            return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(
+              mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (!isUser) ...[Container(width: 28, height: 28, decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.smart_toy_outlined, color: AppTheme.primary, size: 16)), const SizedBox(width: 8)],
+                Flexible(child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(color: isUser ? AppTheme.primary : AppTheme.surfaceCard, borderRadius: BorderRadius.only(topLeft: const Radius.circular(16), topRight: const Radius.circular(16), bottomLeft: Radius.circular(isUser ? 16 : 4), bottomRight: Radius.circular(isUser ? 4 : 16))),
+                  child: Text(msg.text, style: TextStyle(color: isUser ? Colors.black : AppTheme.textPrimary, fontSize: 14, height: 1.4)),
+                )),
+                if (isUser) const SizedBox(width: 4),
+              ],
+            ));
           },
         )),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: AppTheme.surface, border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05)))),
+        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppTheme.surface, border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05)))),
           child: SafeArea(child: Row(children: [
             Expanded(child: TextField(controller: _controller, style: const TextStyle(color: AppTheme.textPrimary), decoration: const InputDecoration(hintText: 'Напиши тренеру...'), onSubmitted: (_) => _sendMessage())),
             const SizedBox(width: 8),
@@ -873,12 +738,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
 // ---------- ПРОГРЕСС ----------
 
-class ProgressEntry {
-  final DateTime date;
-  final double? weightKg;
-  final bool workoutCompleted;
-  ProgressEntry({required this.date, this.weightKg, required this.workoutCompleted});
-}
+class ProgressEntry { final DateTime date; final double? weightKg; final bool workoutCompleted; ProgressEntry({required this.date, this.weightKg, required this.workoutCompleted}); }
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -895,17 +755,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
   final TextEditingController _weightController = TextEditingController();
   bool _workoutDone = true;
 
-  void _addEntry() {
-    final weight = double.tryParse(_weightController.text.replaceAll(',', '.'));
-    setState(() { _entries.add(ProgressEntry(date: DateTime.now(), weightKg: weight, workoutCompleted: _workoutDone)); _weightController.clear(); _workoutDone = true; });
-    Navigator.pop(context);
-  }
+  void _addEntry() { final weight = double.tryParse(_weightController.text.replaceAll(',', '.')); setState(() { _entries.add(ProgressEntry(date: DateTime.now(), weightKg: weight, workoutCompleted: _workoutDone)); _weightController.clear(); _workoutDone = true; }); Navigator.pop(context); }
 
   void _showAddSheet() {
-    showModalBottomSheet(
-      context: context, isScrollControlled: true,
-      backgroundColor: AppTheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: AppTheme.surface, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Padding(
         padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -923,12 +776,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  String _formatDate(DateTime d) {
-    final diff = DateTime.now().difference(d).inDays;
-    if (diff == 0) return 'Сегодня';
-    if (diff == 1) return 'Вчера';
-    return '${d.day}.${d.month.toString().padLeft(2, '0')}.${d.year}';
-  }
+  String _formatDate(DateTime d) { final diff = DateTime.now().difference(d).inDays; if (diff == 0) return 'Сегодня'; if (diff == 1) return 'Вчера'; return '${d.day}.${d.month.toString().padLeft(2, '0')}.${d.year}'; }
 
   @override
   void dispose() { _weightController.dispose(); super.dispose(); }
@@ -952,8 +800,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         const Text('История', style: TextStyle(color: AppTheme.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
         ..._entries.reversed.map((e) => Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(14),
+          margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: e.workoutCompleted ? AppTheme.primary.withOpacity(0.2) : Colors.white.withOpacity(0.05))),
           child: Row(children: [
             Container(width: 40, height: 40, decoration: BoxDecoration(color: e.workoutCompleted ? AppTheme.primary.withOpacity(0.15) : AppTheme.textSecondary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(e.workoutCompleted ? Icons.check : Icons.close, color: e.workoutCompleted ? AppTheme.primary : AppTheme.textSecondary, size: 20)),
@@ -972,11 +819,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 }
 
 class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-  final Color? valueColor;
+  final IconData icon; final Color iconColor; final String label; final String value; final Color? valueColor;
   const _StatCard({required this.icon, required this.iconColor, required this.label, required this.value, this.valueColor});
 
   @override
@@ -1009,10 +852,10 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(16)),
           child: Row(children: [
-            Container(width: 52, height: 52, decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppTheme.primary, AppTheme.primaryDark]), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.person, color: Colors.black, size: 28)),
+            const VexorLogo(size: 52),
             const SizedBox(width: 14),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Пользователь', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 16)),
+              const Text('Vexor', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 16)),
               Text('Бесплатный план', style: Theme.of(context).textTheme.bodySmall),
             ]),
           ]),
@@ -1021,7 +864,12 @@ class SettingsScreen extends StatelessWidget {
         _SettingsTile(icon: Icons.workspace_premium_outlined, label: 'Подписка Premium', color: AppTheme.warning),
         _SettingsTile(
           icon: Icons.logout, label: 'Выйти', color: AppTheme.danger,
-          onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen())),
+          onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('onboarding_done', false);
+            if (!context.mounted) return;
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+          },
         ),
       ]),
     );
@@ -1029,10 +877,7 @@ class SettingsScreen extends StatelessWidget {
 }
 
 class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
+  final IconData icon; final String label; final Color color; final VoidCallback? onTap;
   const _SettingsTile({required this.icon, required this.label, required this.color, this.onTap});
 
   @override
