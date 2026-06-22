@@ -36,6 +36,7 @@ class NotificationService {
       0, 'Vexor — время тренировки! 💪', 'Не пропусти сегодняшнюю тренировку', scheduled,
       const NotificationDetails(android: AndroidNotificationDetails('workout_reminder', 'Напоминания о тренировке', channelDescription: 'Ежедневное напоминание', importance: Importance.high, priority: Priority.high)),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
