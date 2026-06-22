@@ -1,7 +1,8 @@
 // Путь в репозитории: mobile/lib/main.dart
-// Push-уведомления с выбором времени в настройках
+// Добавлен график веса на экране Прогресс + исправлен spread type error
 
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -227,8 +228,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _goals = const [{'value': 'weight_loss', 'label': 'Снижение веса', 'icon': '🔥'}, {'value': 'muscle_gain', 'label': 'Набор массы', 'icon': '💪'}, {'value': 'endurance', 'label': 'Выносливость', 'icon': '🏃'}];
   final _levels = const [{'value': 'beginner', 'label': 'Новичок'}, {'value': 'intermediate', 'label': 'Средний'}, {'value': 'advanced', 'label': 'Продвинутый'}];
   final _equipmentOptions = const [{'value': 'dumbbells', 'label': 'Гантели'}, {'value': 'barbell', 'label': 'Штанга'}, {'value': 'resistance_bands', 'label': 'Резинки'}, {'value': 'pull_up_bar', 'label': 'Турник'}, {'value': 'none', 'label': 'Без оборудования'}];
-  String? _selectedGoal;
-  String? _selectedLevel;
+  String? _selectedGoal; String? _selectedLevel;
   final Set<String> _selectedEquipment = {};
   final TextEditingController _restrictionsController = TextEditingController();
   bool _isSaving = false;
@@ -336,15 +336,19 @@ class _PlanScreenState extends State<PlanScreen> {
           return GestureDetector(onTap: () => setState(() => _selectedDay = i), child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(right: 8), width: 52, decoration: BoxDecoration(color: selected ? AppTheme.primary : AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: selected ? AppTheme.primary : const Color(0xFF2E3247))),
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(d.day, style: TextStyle(color: selected ? Colors.black : AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)), const SizedBox(height: 4), Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: selected ? Colors.black.withOpacity(0.4) : d.exercises.isNotEmpty ? AppTheme.primary : AppTheme.textSecondary.withOpacity(0.3)))])));
         })),
-        Expanded(child: isRest ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Text('😴', style: TextStyle(fontSize: 52)), const SizedBox(height: 16), const Text('День отдыха', style: TextStyle(color: AppTheme.textPrimary, fontSize: 20, fontWeight: FontWeight.w700)), const SizedBox(height: 8), Text('${today.label} — восстановление', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14))])) : ListView(padding: const EdgeInsets.all(16), children: [
-          Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: [AppTheme.primary.withOpacity(0.15), AppTheme.surfaceCard], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.primary.withOpacity(0.2))),
-            child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(today.label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)), const SizedBox(height: 4), Text(today.type, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)), const SizedBox(height: 8), Text('${today.exercises.length} упражнений', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13))])),
-              Stack(alignment: Alignment.center, children: [SizedBox(width: 52, height: 52, child: CircularProgressIndicator(value: today.exercises.isEmpty ? 0 : doneCount / today.exercises.length, backgroundColor: AppTheme.surface, color: AppTheme.primary, strokeWidth: 4)), Text('$doneCount/${today.exercises.length}', style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontWeight: FontWeight.w700))])])),
-          const SizedBox(height: 16),
-          ...today.exercises.map((ex) => GestureDetector(onTap: () => setState(() => ex.done = !ex.done), child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: ex.done ? AppTheme.primary.withOpacity(0.1) : AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: ex.done ? AppTheme.primary.withOpacity(0.4) : const Color(0xFF2E3247))),
-            child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: ex.done ? AppTheme.primary : AppTheme.surface, borderRadius: BorderRadius.circular(10)), child: Icon(ex.done ? Icons.check : ex.icon, color: ex.done ? Colors.black : AppTheme.textSecondary, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(ex.name, style: TextStyle(color: ex.done ? AppTheme.primary : AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14, decoration: ex.done ? TextDecoration.lineThrough : null, decorationColor: AppTheme.primary)), const SizedBox(height: 2), Text(ex.muscles, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12))])), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(8)), child: Text(ex.sets, style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700)))]))),
-          const SizedBox(height: 80),
-        ])),
+        Expanded(child: isRest
+          ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Text('😴', style: TextStyle(fontSize: 52)), const SizedBox(height: 16), const Text('День отдыха', style: TextStyle(color: AppTheme.textPrimary, fontSize: 20, fontWeight: FontWeight.w700)), const SizedBox(height: 8), Text('${today.label} — восстановление', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14))]))
+          : ListView(padding: const EdgeInsets.all(16), children: [
+              Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: LinearGradient(colors: [AppTheme.primary.withOpacity(0.15), AppTheme.surfaceCard], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.primary.withOpacity(0.2))),
+                child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(today.label, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)), const SizedBox(height: 4), Text(today.type, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 18, fontWeight: FontWeight.w700)), const SizedBox(height: 8), Text('${today.exercises.length} упражнений', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13))])),
+                  Stack(alignment: Alignment.center, children: [SizedBox(width: 52, height: 52, child: CircularProgressIndicator(value: today.exercises.isEmpty ? 0 : doneCount / today.exercises.length, backgroundColor: AppTheme.surface, color: AppTheme.primary, strokeWidth: 4)), Text('$doneCount/${today.exercises.length}', style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontWeight: FontWeight.w700))])])),
+              const SizedBox(height: 16),
+              // ИСПРАВЛЕН spread type error — добавлен <Widget>
+              ...today.exercises.map<Widget>((ex) => GestureDetector(onTap: () => setState(() => ex.done = !ex.done), child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: ex.done ? AppTheme.primary.withOpacity(0.1) : AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: ex.done ? AppTheme.primary.withOpacity(0.4) : const Color(0xFF2E3247))),
+                child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: ex.done ? AppTheme.primary : AppTheme.surface, borderRadius: BorderRadius.circular(10)), child: Icon(ex.done ? Icons.check : ex.icon, color: ex.done ? Colors.black : AppTheme.textSecondary, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(ex.name, style: TextStyle(color: ex.done ? AppTheme.primary : AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14, decoration: ex.done ? TextDecoration.lineThrough : null, decorationColor: AppTheme.primary)), const SizedBox(height: 2), Text(ex.muscles, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12))])), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(8)), child: Text(ex.sets, style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700)))]))),
+              const SizedBox(height: 80),
+            ]),
+        ),
       ]),
     );
   }
@@ -400,6 +404,60 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
+// ---------- ГРАФИК ВЕСА ----------
+
+class WeightChartPainter extends CustomPainter {
+  final List<double> weights;
+  final Color lineColor;
+  final Color fillColor;
+
+  WeightChartPainter({required this.weights, required this.lineColor, required this.fillColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (weights.length < 2) return;
+
+    final minW = weights.reduce(math.min);
+    final maxW = weights.reduce(math.max);
+    final range = (maxW - minW).abs() < 0.1 ? 1.0 : maxW - minW;
+    final padding = range * 0.3;
+
+    double x(int i) => i / (weights.length - 1) * size.width;
+    double y(double w) => size.height - ((w - minW + padding) / (range + padding * 2)) * size.height;
+
+    final points = List.generate(weights.length, (i) => Offset(x(i), y(weights[i])));
+
+    // Заливка под графиком
+    final fillPath = Path()..moveTo(points.first.dx, size.height);
+    for (final p in points) fillPath.lineTo(p.dx, p.dy);
+    fillPath..lineTo(points.last.dx, size.height)..close();
+
+    canvas.drawPath(fillPath, Paint()..shader = LinearGradient(
+      colors: [lineColor.withOpacity(0.3), lineColor.withOpacity(0.0)],
+      begin: Alignment.topCenter, end: Alignment.bottomCenter,
+    ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)));
+
+    // Линия графика
+    final linePaint = Paint()..color = lineColor..strokeWidth = 2.5..style = PaintingStyle.stroke..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
+    final linePath = Path()..moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      final cp1 = Offset((points[i - 1].dx + points[i].dx) / 2, points[i - 1].dy);
+      final cp2 = Offset((points[i - 1].dx + points[i].dx) / 2, points[i].dy);
+      linePath.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, points[i].dx, points[i].dy);
+    }
+    canvas.drawPath(linePath, linePaint);
+
+    // Точки
+    for (final p in points) {
+      canvas.drawCircle(p, 4, Paint()..color = lineColor);
+      canvas.drawCircle(p, 2.5, Paint()..color = Colors.black);
+    }
+  }
+
+  @override
+  bool shouldRepaint(WeightChartPainter old) => old.weights != weights;
+}
+
 // ---------- ПРОГРЕСС ----------
 
 class ProgressEntry { final DateTime date; final double? weightKg; final bool workoutCompleted; ProgressEntry({required this.date, this.weightKg, required this.workoutCompleted}); }
@@ -412,6 +470,9 @@ class ProgressScreen extends StatefulWidget {
 
 class _ProgressScreenState extends State<ProgressScreen> {
   final List<ProgressEntry> _entries = [
+    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 10)), weightKg: 81.0, workoutCompleted: true),
+    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 8)), weightKg: 80.5, workoutCompleted: true),
+    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 6)), weightKg: 80.2, workoutCompleted: false),
     ProgressEntry(date: DateTime.now().subtract(const Duration(days: 4)), weightKg: 80.0, workoutCompleted: true),
     ProgressEntry(date: DateTime.now().subtract(const Duration(days: 2)), weightKg: 79.5, workoutCompleted: true),
     ProgressEntry(date: DateTime.now().subtract(const Duration(days: 1)), weightKg: 79.2, workoutCompleted: false),
@@ -419,7 +480,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
   final TextEditingController _weightController = TextEditingController();
   bool _workoutDone = true;
 
-  void _addEntry() { final weight = double.tryParse(_weightController.text.replaceAll(',', '.')); setState(() { _entries.add(ProgressEntry(date: DateTime.now(), weightKg: weight, workoutCompleted: _workoutDone)); _weightController.clear(); _workoutDone = true; }); Navigator.pop(context); }
+  void _addEntry() {
+    final weight = double.tryParse(_weightController.text.replaceAll(',', '.'));
+    setState(() { _entries.add(ProgressEntry(date: DateTime.now(), weightKg: weight, workoutCompleted: _workoutDone)); _weightController.clear(); _workoutDone = true; });
+    Navigator.pop(context);
+  }
 
   void _showAddSheet() {
     showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: AppTheme.surface, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -434,7 +499,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         ]))));
   }
 
-  String _formatDate(DateTime d) { final diff = DateTime.now().difference(d).inDays; if (diff == 0) return 'Сегодня'; if (diff == 1) return 'Вчера'; return '${d.day}.${d.month.toString().padLeft(2, '0')}.${d.year}'; }
+  String _formatDate(DateTime d) { final diff = DateTime.now().difference(d).inDays; if (diff == 0) return 'Сегодня'; if (diff == 1) return 'Вчера'; return '${d.day}.${d.month.toString().padLeft(2, '0')}'; }
 
   @override
   void dispose() { _weightController.dispose(); super.dispose(); }
@@ -442,16 +507,64 @@ class _ProgressScreenState extends State<ProgressScreen> {
   @override
   Widget build(BuildContext context) {
     final completed = _entries.where((e) => e.workoutCompleted).length;
-    final weights = _entries.where((e) => e.weightKg != null).map((e) => e.weightKg!).toList();
-    final weightDelta = weights.length >= 2 ? weights.last - weights.first : null;
+    final weights = _entries.where((e) => e.weightKg != null).toList();
+    final weightValues = weights.map((e) => e.weightKg!).toList();
+    final weightDelta = weightValues.length >= 2 ? weightValues.last - weightValues.first : null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Прогресс')),
       floatingActionButton: FloatingActionButton.extended(onPressed: _showAddSheet, backgroundColor: AppTheme.primary, foregroundColor: Colors.black, icon: const Icon(Icons.add), label: const Text('Добавить', style: TextStyle(fontWeight: FontWeight.w700))),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        Row(children: [Expanded(child: _StatCard(icon: Icons.local_fire_department, iconColor: AppTheme.warning, label: 'Тренировок', value: '$completed')), const SizedBox(width: 12), Expanded(child: _StatCard(icon: Icons.monitor_weight_outlined, iconColor: AppTheme.primary, label: 'Изменение веса', value: weightDelta != null ? '${weightDelta > 0 ? '+' : ''}${weightDelta.toStringAsFixed(1)} кг' : '—', valueColor: weightDelta == null ? null : weightDelta <= 0 ? AppTheme.primary : AppTheme.danger))]),
-        const SizedBox(height: 24), const Text('История', style: TextStyle(color: AppTheme.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)), const SizedBox(height: 12),
-        ..._entries.reversed.map((e) => Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: e.workoutCompleted ? AppTheme.primary.withOpacity(0.2) : Colors.white.withOpacity(0.05))),
-          child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: e.workoutCompleted ? AppTheme.primary.withOpacity(0.15) : AppTheme.textSecondary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(e.workoutCompleted ? Icons.check : Icons.close, color: e.workoutCompleted ? AppTheme.primary : AppTheme.textSecondary, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_formatDate(e.date), style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)), Text(e.workoutCompleted ? 'Тренировка выполнена' : 'Тренировка пропущена', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12))])), if (e.weightKg != null) Text('${e.weightKg!.toStringAsFixed(1)} кг', style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 15))]))),
+        // Карточки статистики
+        Row(children: [
+          Expanded(child: _StatCard(icon: Icons.local_fire_department, iconColor: AppTheme.warning, label: 'Тренировок', value: '$completed')),
+          const SizedBox(width: 12),
+          Expanded(child: _StatCard(icon: Icons.monitor_weight_outlined, iconColor: AppTheme.primary, label: 'Изменение', value: weightDelta != null ? '${weightDelta > 0 ? '+' : ''}${weightDelta.toStringAsFixed(1)} кг' : '—', valueColor: weightDelta == null ? null : weightDelta <= 0 ? AppTheme.primary : AppTheme.danger)),
+        ]),
+        const SizedBox(height: 16),
+
+        // График веса
+        if (weightValues.length >= 2) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(width: 32, height: 32, decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.show_chart, color: AppTheme.primary, size: 18)),
+                const SizedBox(width: 10),
+                const Text('График веса', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
+                const Spacer(),
+                Text('${weightValues.first.toStringAsFixed(1)} → ${weightValues.last.toStringAsFixed(1)} кг', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+              ]),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 120,
+                child: CustomPaint(
+                  painter: WeightChartPainter(weights: weightValues, lineColor: AppTheme.primary, fillColor: AppTheme.primary),
+                  size: const Size(double.infinity, 120),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Подписи дат
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: weights.map((e) => Text(_formatDate(e.date), style: const TextStyle(color: AppTheme.textSecondary, fontSize: 10))).toList()),
+            ]),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // История
+        const Text('История', style: TextStyle(color: AppTheme.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        ..._entries.reversed.map<Widget>((e) => Container(
+          margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: e.workoutCompleted ? AppTheme.primary.withOpacity(0.2) : Colors.white.withOpacity(0.05))),
+          child: Row(children: [
+            Container(width: 40, height: 40, decoration: BoxDecoration(color: e.workoutCompleted ? AppTheme.primary.withOpacity(0.15) : AppTheme.textSecondary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(e.workoutCompleted ? Icons.check : Icons.close, color: e.workoutCompleted ? AppTheme.primary : AppTheme.textSecondary, size: 20)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_formatDate(e.date), style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)), Text(e.workoutCompleted ? 'Тренировка выполнена' : 'Тренировка пропущена', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12))])),
+            if (e.weightKg != null) Text('${e.weightKg!.toStringAsFixed(1)} кг', style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 15)),
+          ]),
+        )),
         const SizedBox(height: 80),
       ]),
     );
@@ -490,19 +603,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _toggleNotifications(bool val) async {
     final prefs = await SharedPreferences.getInstance();
-    if (val) {
-      await NotificationService.requestPermission();
-      await NotificationService.scheduleDaily(_reminderTime.hour, _reminderTime.minute);
-    } else {
-      await NotificationService.cancel();
-    }
+    if (val) { await NotificationService.requestPermission(); await NotificationService.scheduleDaily(_reminderTime.hour, _reminderTime.minute); }
+    else { await NotificationService.cancel(); }
     await prefs.setBool('notifications_enabled', val);
     setState(() => _notificationsEnabled = val);
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _reminderTime,
-      builder: (context, child) => Theme(data: Theme.of(context).copyWith(colorScheme: const ColorScheme.dark(primary: AppTheme.primary, onSurface: AppTheme.textPrimary, surface: AppTheme.surfaceCard)), child: child!));
+    final picked = await showTimePicker(context: context, initialTime: _reminderTime, builder: (context, child) => Theme(data: Theme.of(context).copyWith(colorScheme: const ColorScheme.dark(primary: AppTheme.primary, onSurface: AppTheme.textPrimary, surface: AppTheme.surfaceCard)), child: child!));
     if (picked != null && mounted) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('reminder_hour', picked.hour);
