@@ -1,54 +1,51 @@
-// Путь в репозитории: mobile/lib/services/api_client.dart
-// Методы соответствуют docs/api-contract.md. Когда друг задеплоит бэкенд — поменяй baseUrl.
-// Добавь в pubspec.yaml под dependencies: http: ^1.2.0
-
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-const String baseUrl = 'https://TODO-backend-url.onrender.com';
+const String baseUrl = 'https://vexor-backend-84uf.onrender.com';
 
 class ApiClient {
   String? _token;
 
-  void setToken(String token) => _token = token;
+  Future<void> loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('auth_token');
+  }
+
+  Future<void> saveToken(String token) async {
+    _token = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+  }
+
+  Future<void> clearToken() async {
+    _token = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+  }
 
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        if (_token != null) 'Authorization': 'Bearer $_token',
-      };
+    'Content-Type': 'application/json',
+    if (_token != null) 'Authorization': 'Bearer $_token',
+  };
 
-  Future<Map<String, dynamic>> generatePlan() async {
+  Future<Map<String, dynamic>> register(String email, String password) async {
     final res = await http.post(
-      Uri.parse('$baseUrl/plans/generate'),
+      Uri.parse('$baseUrl/register'),
       headers: _headers,
-      body: jsonEncode({}),
+      body: jsonEncode({'email': email, 'password': password}),
     );
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> sendChatMessage(String message) async {
+  Future<Map<String, dynamic>> login(String email, String password) async {
     final res = await http.post(
-      Uri.parse('$baseUrl/chat/message'),
+      Uri.parse('$baseUrl/login'),
       headers: _headers,
-      body: jsonEncode({'message': message}),
-    );
-    return jsonDecode(res.body) as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> logProgress({
-    required String date,
-    required double weightKg,
-    required bool workoutCompleted,
-  }) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/progress/log'),
-      headers: _headers,
-      body: jsonEncode({
-        'date': date,
-        'weight_kg': weightKg,
-        'workout_completed': workoutCompleted,
-      }),
+      body: jsonEncode({'email': email, 'password': password}),
     );
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 }
+
+final apiClient = ApiClient();

@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
-
+import 'services/api_client.dart';
 // ---------- СЕРВИС УВЕДОМЛЕНИЙ ----------
 
 class NotificationService {
@@ -169,7 +169,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     if (email.isEmpty || password.isEmpty) { setState(() => _errorMessage = 'Заполни все поля'); return; }
     if (!_isValidEmail(email)) { setState(() => _errorMessage = 'Некорректный email'); return; }
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    final res = await apiClient.login(email, password);
+if (res['status'] != 'success') {
+  setState(() => _errorMessage = res['message'] ?? 'Ошибка входа');
+  setState(() => _isLoading = false);
+  return;
+}
+await apiClient.saveToken(res['access_token']);
     if (!mounted) return;
     setState(() => _isLoading = false);
     await _navigateAfterAuth();
@@ -185,7 +191,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     if (password.length < 6) { setState(() => _errorMessage = 'Пароль минимум 6 символов'); return; }
     if (password != confirm) { setState(() => _errorMessage = 'Пароли не совпадают'); return; }
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 800));
+    final res = await apiClient.register(email, password);
+if (res['status'] != 'success') {
+  setState(() => _errorMessage = res['message'] ?? 'Ошибка регистрации');
+  setState(() => _isLoading = false);
+  return;
+}
     if (!mounted) return;
     setState(() => _isLoading = false);
     await _navigateAfterAuth();
@@ -346,7 +357,7 @@ class _PlanScreenState extends State<PlanScreen> {
               const SizedBox(height: 16),
               // ИСПРАВЛЕН spread type error — добавлен <Widget>
               ...today.exercises.map<Widget>((ex) => GestureDetector(onTap: () => setState(() => ex.done = !ex.done), child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: ex.done ? AppTheme.primary.withOpacity(0.1) : AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: ex.done ? AppTheme.primary.withOpacity(0.4) : const Color(0xFF2E3247))),
-                child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: ex.done ? AppTheme.primary : AppTheme.surface, borderRadius: BorderRadius.circular(10)), child: Icon(ex.done ? Icons.check : ex.icon, color: ex.done ? Colors.black : AppTheme.textSecondary, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(ex.name, style: TextStyle(color: ex.done ? AppTheme.primary : AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14, decoration: ex.done ? TextDecoration.lineThrough : null, decorationColor: AppTheme.primary)), const SizedBox(height: 2), Text(ex.muscles, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12))])), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(8)), child: Text(ex.sets, style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700)))])),
+                child: Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: ex.done ? AppTheme.primary : AppTheme.surface, borderRadius: BorderRadius.circular(10)), child: Icon(ex.done ? Icons.check : ex.icon, color: ex.done ? Colors.black : AppTheme.textSecondary, size: 20)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(ex.name, style: TextStyle(color: ex.done ? AppTheme.primary : AppTheme.textPrimary, fontWeight: FontWeight.w600, fontSize: 14, decoration: ex.done ? TextDecoration.lineThrough : null, decorationColor: AppTheme.primary)), const SizedBox(height: 2), Text(ex.muscles, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12))])), Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(8)), child: Text(ex.sets, style: const TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w700)))]))))),
               const SizedBox(height: 80),
             ]),
         ),
