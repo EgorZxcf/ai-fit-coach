@@ -169,13 +169,17 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     if (email.isEmpty || password.isEmpty) { setState(() => _errorMessage = 'Заполни все поля'); return; }
     if (!_isValidEmail(email)) { setState(() => _errorMessage = 'Некорректный email'); return; }
     setState(() => _isLoading = true);
-    final res = await apiClient.login(email, password);
-if (res['status'] != 'success') {
-  setState(() => _errorMessage = res['message'] ?? 'Ошибка входа');
-  setState(() => _isLoading = false);
-  return;
-}
-await apiClient.saveToken(res['access_token']);
+    try {
+      final res = await apiClient.login(email, password);
+      if (res['status'] != 'success') {
+        setState(() { _errorMessage = res['message'] ?? 'Ошибка входа'; _isLoading = false; });
+        return;
+      }
+      await apiClient.saveToken(res['access_token']);
+    } catch (e) {
+      setState(() { _errorMessage = 'Сервер недоступен. Попробуй позже.'; _isLoading = false; });
+      return;
+    }
     if (!mounted) return;
     setState(() => _isLoading = false);
     await _navigateAfterAuth();
@@ -191,7 +195,6 @@ await apiClient.saveToken(res['access_token']);
     if (password.length < 6) { setState(() => _errorMessage = 'Пароль минимум 6 символов'); return; }
     if (password != confirm) { setState(() => _errorMessage = 'Пароли не совпадают'); return; }
     setState(() => _isLoading = true);
-    final res = await apiClient.register(email, password);
 try {
   final res = await apiClient.register(email, password);
   if (res['status'] != 'success') {
@@ -202,6 +205,7 @@ try {
   setState(() { _errorMessage = 'Сервер недоступен. Попробуй позже.'; _isLoading = false; });
   return;
 }
+  }
 
   Widget _buildTextField({required TextEditingController controller, required String hint, required IconData icon, bool isPassword = false, bool passwordVisible = false, VoidCallback? onTogglePassword, TextInputType keyboardType = TextInputType.text}) {
     return TextField(controller: controller, obscureText: isPassword && !passwordVisible, keyboardType: keyboardType, style: const TextStyle(color: AppTheme.textPrimary),
@@ -211,22 +215,89 @@ try {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const SizedBox(height: 24),
-        Center(child: Column(children: [const VexorLogo(size: 80), const SizedBox(height: 16), const Text('Vexor', style: TextStyle(color: AppTheme.textPrimary, fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: -0.5)), const SizedBox(height: 6), const Text('Твой персональный AI-тренер', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14))])),
-        const SizedBox(height: 36),
-        Container(decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14)), child: TabBar(controller: _tabController, indicator: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(12)), indicatorSize: TabBarIndicatorSize.tab, dividerColor: Colors.transparent, labelColor: Colors.black, unselectedLabelColor: AppTheme.textSecondary, labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), tabs: const [Tab(text: 'Войти'), Tab(text: 'Регистрация')])),
-        const SizedBox(height: 24),
-        if (_errorMessage != null) Container(margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: AppTheme.danger.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.danger.withOpacity(0.3))), child: Row(children: [const Icon(Icons.error_outline, color: AppTheme.danger, size: 18), const SizedBox(width: 8), Text(_errorMessage!, style: const TextStyle(color: AppTheme.danger, fontSize: 13))])),
-        SizedBox(height: 320, child: TabBarView(controller: _tabController, children: [
-          Column(children: [_buildTextField(controller: _loginEmailController, hint: 'Email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress), const SizedBox(height: 12), _buildTextField(controller: _loginPasswordController, hint: 'Пароль', icon: Icons.lock_outline, isPassword: true, passwordVisible: _loginPasswordVisible, onTogglePassword: () => setState(() => _loginPasswordVisible = !_loginPasswordVisible)), const SizedBox(height: 8), Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () {}, child: const Text('Забыл пароль?', style: TextStyle(color: AppTheme.primary, fontSize: 13)))), const SizedBox(height: 8), _isLoading ? const CircularProgressIndicator(color: AppTheme.primary) : FilledButton(onPressed: _login, child: const Text('Войти'))]),
-          Column(children: [_buildTextField(controller: _regEmailController, hint: 'Email', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress), const SizedBox(height: 12), _buildTextField(controller: _regPasswordController, hint: 'Пароль (минимум 6 символов)', icon: Icons.lock_outline, isPassword: true, passwordVisible: _regPasswordVisible, onTogglePassword: () => setState(() => _regPasswordVisible = !_regPasswordVisible)), const SizedBox(height: 12), _buildTextField(controller: _regPasswordConfirmController, hint: 'Повтори пароль', icon: Icons.lock_outline, isPassword: true, passwordVisible: _regPasswordConfirmVisible, onTogglePassword: () => setState(() => _regPasswordConfirmVisible = !_regPasswordConfirmVisible)), const SizedBox(height: 16), _isLoading ? const CircularProgressIndicator(color: AppTheme.primary) : FilledButton(onPressed: _register, child: const Text('Создать аккаунт'))]),
-        ])),
-        const SizedBox(height: 24),
-        const Center(child: Text('Нажимая кнопку, ты соглашаешься с условиями использования.\nПриложение не заменяет консультацию врача.', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSecondary, fontSize: 11, height: 1.6))),
-      ]))),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF131920), Color(0xFF0A0E17)],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(child: SingleChildScrollView(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          const SizedBox(height: 40),
+          // Логотип с подсветкой
+          Stack(alignment: Alignment.center, children: [
+            Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [AppTheme.primary.withOpacity(0.2), Colors.transparent]))),
+            const VexorLogo(size: 88),
+          ]),
+          const SizedBox(height: 20),
+          const Text('Vexor', style: TextStyle(color: AppTheme.textPrimary, fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -1)),
+          const SizedBox(height: 6),
+          const Text('Твой персональный AI-тренер', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
+          const SizedBox(height: 32),
+          // Переключатель вкладок
+          Container(decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14)), child: TabBar(controller: _tabController, indicator: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(12)), indicatorSize: TabBarIndicatorSize.tab, dividerColor: Colors.transparent, labelColor: Colors.black, unselectedLabelColor: AppTheme.textSecondary, labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), tabs: const [Tab(text: 'Войти'), Tab(text: 'Регистрация')])),
+          const SizedBox(height: 20),
+          // Ошибка
+          if (_errorMessage != null) Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: AppTheme.danger.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.danger.withOpacity(0.3))), child: Row(children: [const Icon(Icons.error_outline, color: AppTheme.danger, size: 18), const SizedBox(width: 8), Expanded(child: Text(_errorMessage!, style: const TextStyle(color: AppTheme.danger, fontSize: 13)))])),
+          // Форма
+          SizedBox(height: _tabController.index == 0 ? 280 : 340, child: TabBarView(controller: _tabController, children: [
+            // Вход
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Email', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              _buildTextField(controller: _loginEmailController, hint: 'example@mail.com', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+              const SizedBox(height: 14),
+              const Text('Пароль', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              _buildTextField(controller: _loginPasswordController, hint: '••••••••', icon: Icons.lock_outline, isPassword: true, passwordVisible: _loginPasswordVisible, onTogglePassword: () => setState(() => _loginPasswordVisible = !_loginPasswordVisible)),
+              Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () {}, child: const Text('Забыл пароль?', style: TextStyle(color: AppTheme.primary, fontSize: 12)))),
+              const SizedBox(height: 4),
+              _isLoading ? const Center(child: CircularProgressIndicator(color: AppTheme.primary)) : FilledButton(onPressed: _login, child: const Text('Войти')),
+            ]),
+            // Регистрация
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Email', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              _buildTextField(controller: _regEmailController, hint: 'example@mail.com', icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
+              const SizedBox(height: 14),
+              const Text('Пароль', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              _buildTextField(controller: _regPasswordController, hint: 'Минимум 6 символов', icon: Icons.lock_outline, isPassword: true, passwordVisible: _regPasswordVisible, onTogglePassword: () => setState(() => _regPasswordVisible = !_regPasswordVisible)),
+              const SizedBox(height: 14),
+              const Text('Повтори пароль', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              _buildTextField(controller: _regPasswordConfirmController, hint: '••••••••', icon: Icons.lock_outline, isPassword: true, passwordVisible: _regPasswordConfirmVisible, onTogglePassword: () => setState(() => _regPasswordConfirmVisible = !_regPasswordConfirmVisible)),
+              const SizedBox(height: 16),
+              _isLoading ? const Center(child: CircularProgressIndicator(color: AppTheme.primary)) : FilledButton(onPressed: _register, child: const Text('Создать аккаунт')),
+            ]),
+          ])),
+          const SizedBox(height: 24),
+          // Фичи
+          Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+            _FeatureChip(icon: Icons.smart_toy_outlined, label: 'AI-тренер'),
+            _FeatureChip(icon: Icons.show_chart, label: 'Прогресс'),
+            _FeatureChip(icon: Icons.fitness_center, label: 'Планы'),
+          ]),
+          const SizedBox(height: 20),
+          const Text('Нажимая кнопку, ты соглашаешься с условиями использования.\nПриложение не заменяет консультацию врача.', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSecondary, fontSize: 10, height: 1.6)),
+          const SizedBox(height: 16),
+        ]))),
+      ),
     );
   }
+}
+
+class _FeatureChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _FeatureChip({required this.icon, required this.label});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(color: AppTheme.surfaceCard, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.primary.withOpacity(0.2))),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: AppTheme.primary, size: 14), const SizedBox(width: 6), Text(label, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontWeight: FontWeight.w500))]),
+  );
+}
 }
 
 // ---------- ОНБОРДИНГ ----------
