@@ -192,15 +192,16 @@ await apiClient.saveToken(res['access_token']);
     if (password != confirm) { setState(() => _errorMessage = 'Пароли не совпадают'); return; }
     setState(() => _isLoading = true);
     final res = await apiClient.register(email, password);
-if (res['status'] != 'success') {
-  setState(() => _errorMessage = res['message'] ?? 'Ошибка регистрации');
-  setState(() => _isLoading = false);
+try {
+  final res = await apiClient.register(email, password);
+  if (res['status'] != 'success') {
+    setState(() { _errorMessage = res['message'] ?? 'Ошибка регистрации'; _isLoading = false; });
+    return;
+  }
+} catch (e) {
+  setState(() { _errorMessage = 'Сервер недоступен. Попробуй позже.'; _isLoading = false; });
   return;
 }
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    await _navigateAfterAuth();
-  }
 
   Widget _buildTextField({required TextEditingController controller, required String hint, required IconData icon, bool isPassword = false, bool passwordVisible = false, VoidCallback? onTogglePassword, TextInputType keyboardType = TextInputType.text}) {
     return TextField(controller: controller, obscureText: isPassword && !passwordVisible, keyboardType: keyboardType, style: const TextStyle(color: AppTheme.textPrimary),
