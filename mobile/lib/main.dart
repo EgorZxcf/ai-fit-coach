@@ -298,7 +298,6 @@ class _FeatureChip extends StatelessWidget {
     child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, color: AppTheme.primary, size: 14), const SizedBox(width: 6), Text(label, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 12, fontWeight: FontWeight.w500))]),
   );
 }
-}
 
 // ---------- ОНБОРДИНГ ----------
 
