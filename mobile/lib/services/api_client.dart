@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
+
 const String baseUrl = 'https://vexor-backend-84uf.onrender.com';
 
 class ApiClient {
@@ -29,23 +30,31 @@ class ApiClient {
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
-Future<Map<String, dynamic>> register(String email, String password) async {
-  final res = await http.post(
-    Uri.parse('$baseUrl/register'),
-    headers: _headers,
-    body: jsonEncode({'email': email, 'password': password}),
-  ).timeout(const Duration(seconds: 30));
-  return jsonDecode(res.body) as Map<String, dynamic>;
-}
+  Future<Map<String, dynamic>> register(String email, String password) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/register'),
+        headers: _headers,
+        body: jsonEncode({'email': email, 'password': password}),
+      ).timeout(const Duration(seconds: 30));
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'status': 'error', 'message': e.toString()};
+    }
+  }
 
-Future<Map<String, dynamic>> login(String email, String password) async {
-  final res = await http.post(
-    Uri.parse('$baseUrl/login'),
-    headers: _headers,
-    body: jsonEncode({'email': email, 'password': password}),
-  ).timeout(const Duration(seconds: 30));
-  return jsonDecode(res.body) as Map<String, dynamic>;
-}
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/login'),
+        headers: _headers,
+        body: jsonEncode({'email': email, 'password': password}),
+      ).timeout(const Duration(seconds: 30));
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'status': 'error', 'message': e.toString()};
+    }
+  }
 }
 
 final apiClient = ApiClient();

@@ -92,6 +92,18 @@ class AppTheme {
 
 // ---------- ЛОГОТИП ----------
 
+
+// ---------- ПЛАВНЫЕ ПЕРЕХОДЫ ----------
+class FadeRoute extends PageRouteBuilder {
+  final Widget page;
+  FadeRoute({required this.page}) : super(
+    pageBuilder: (context, animation, secondaryAnimation) => page,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut), child: child);
+    },
+    transitionDuration: const Duration(milliseconds: 400),
+  );
+}
 class VexorLogo extends StatelessWidget {
   final double size;
   const VexorLogo({super.key, this.size = 72});
@@ -136,6 +148,8 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late AnimationController _logoController;
+  late Animation<double> _logoAnimation;
   final _loginEmailController = TextEditingController();
   final _loginPasswordController = TextEditingController();
   final _regEmailController = TextEditingController();
@@ -148,10 +162,21 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   String? _errorMessage;
 
   @override
-  void initState() { super.initState(); _tabController = TabController(length: 2, vsync: this); _tabController.addListener(() => setState(() => _errorMessage = null)); }
+  void initState() { super.initState(); _tabController = TabController(length: 2, vsync: this); _tabController.addListener(() => setState(() => _errorMessage = null)); _logoController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800)); _logoAnimation = CurvedAnimation(parent: _logoController, curve: Curves.elasticOut); _logoController.forward(); }
 
   @override
-  void dispose() { _tabController.dispose(); _loginEmailController.dispose(); _loginPasswordController.dispose(); _regEmailController.dispose(); _regPasswordController.dispose(); _regPasswordConfirmController.dispose(); super.dispose(); }
+  void dispose() { _logoController.dispose(); _tabController.dispose(); _loginEmailController.dispose(); _loginPasswordController.dispose(); _regEmailController.dispose(); _regPasswordController.dispose(); _regPasswordConfirmController.dispose(); super.dispose(); }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [const Icon(Icons.error_outline, color: Colors.white, size: 18), const SizedBox(width: 8), Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontSize: 13)))]),
+      backgroundColor: AppTheme.danger,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 3),
+    ));
+  }
 
   bool _isValidEmail(String email) => RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
 
@@ -159,25 +184,25 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_done') ?? false;
     if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => onboardingDone ? const RootScreen() : const OnboardingScreen()));
+    Navigator.pushReplacement(context, FadeRoute(page: onboardingDone ? const RootScreen() : const OnboardingScreen()));
   }
 
   Future<void> _login() async {
     setState(() => _errorMessage = null);
     final email = _loginEmailController.text.trim();
     final password = _loginPasswordController.text;
-    if (email.isEmpty || password.isEmpty) { setState(() => _errorMessage = 'Заполни все поля'); return; }
-    if (!_isValidEmail(email)) { setState(() => _errorMessage = 'Некорректный email'); return; }
+    if (email.isEmpty || password.isEmpty) { _showError('Заполни все поля'); return; }
+    if (!_isValidEmail(email)) { _showError('Некорректный email'); return; }
     setState(() => _isLoading = true);
     try {
       final res = await apiClient.login(email, password);
       if (res['status'] != 'success') {
-        setState(() { _errorMessage = res['message'] ?? 'Ошибка входа'; _isLoading = false; });
+        _showError(res['message'] ?? 'Ошибка входа'); setState(() => _isLoading = false);
         return;
       }
       await apiClient.saveToken(res['access_token']);
     } catch (e) {
-      setState(() { _errorMessage = 'Сервер недоступен. Попробуй позже.'; _isLoading = false; });
+      _showError('Сервер недоступен. Попробуй позже.'); setState(() => _isLoading = false);
       return;
     }
     if (!mounted) return;
@@ -190,19 +215,19 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     final email = _regEmailController.text.trim();
     final password = _regPasswordController.text;
     final confirm = _regPasswordConfirmController.text;
-    if (email.isEmpty || password.isEmpty || confirm.isEmpty) { setState(() => _errorMessage = 'Заполни все поля'); return; }
-    if (!_isValidEmail(email)) { setState(() => _errorMessage = 'Некорректный email'); return; }
-    if (password.length < 6) { setState(() => _errorMessage = 'Пароль минимум 6 символов'); return; }
-    if (password != confirm) { setState(() => _errorMessage = 'Пароли не совпадают'); return; }
+    if (email.isEmpty || password.isEmpty || confirm.isEmpty) { _showError('Заполни все поля'); return; }
+    if (!_isValidEmail(email)) { _showError('Некорректный email'); return; }
+    if (password.length < 6) { _showError('Пароль минимум 6 символов'); return; }
+    if (password != confirm) { _showError('Пароли не совпадают'); return; }
     setState(() => _isLoading = true);
 try {
   final res = await apiClient.register(email, password);
   if (res['status'] != 'success') {
-    setState(() { _errorMessage = res['message'] ?? 'Ошибка регистрации'; _isLoading = false; });
+    _showError(res['message'] ?? 'Ошибка регистрации'); setState(() => _isLoading = false);
     return;
   }
 } catch (e) {
-  setState(() { _errorMessage = 'Сервер недоступен. Попробуй позже.'; _isLoading = false; });
+  _showError('Сервер недоступен. Попробуй позже.'); setState(() => _isLoading = false);
   return;
 }
   }
@@ -227,7 +252,7 @@ try {
           // Логотип с подсветкой
           Stack(alignment: Alignment.center, children: [
             Container(width: 120, height: 120, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [AppTheme.primary.withOpacity(0.2), Colors.transparent]))),
-            const VexorLogo(size: 88),
+            ScaleTransition(scale: _logoAnimation, child: const VexorLogo(size: 88)),
           ]),
           const SizedBox(height: 20),
           const Text('Vexor', style: TextStyle(color: AppTheme.textPrimary, fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -1)),
@@ -329,7 +354,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await prefs.setStringList('equipment', _selectedEquipment.toList());
     await prefs.setString('restrictions', _restrictionsController.text.trim());
     if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RootScreen()));
+    Navigator.pushReplacement(context, FadeRoute(page: const RootScreen()));
   }
 
   Widget _section(String title) => Padding(padding: const EdgeInsets.only(top: 24, bottom: 10), child: Text(title, style: Theme.of(context).textTheme.titleMedium));
@@ -388,6 +413,26 @@ class _RootScreenState extends State<RootScreen> {
 class Exercise { final String name; final String sets; final String muscles; final IconData icon; bool done; Exercise({required this.name, required this.sets, required this.muscles, required this.icon, this.done = false}); }
 class WorkoutDay { final String day; final String label; final String type; final List<Exercise> exercises; WorkoutDay({required this.day, required this.label, required this.type, required this.exercises}); }
 
+
+// ---------- SKELETON ----------
+class _SkeletonBox extends StatefulWidget {
+  final double width;
+  final double height;
+  final double radius;
+  const _SkeletonBox({required this.width, required this.height, this.radius = 8});
+  @override
+  State<_SkeletonBox> createState() => _SkeletonBoxState();
+}
+class _SkeletonBoxState extends State<_SkeletonBox> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+  @override
+  void initState() { super.initState(); _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900)); _anim = Tween(begin: 0.3, end: 0.7).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut)); _ctrl.repeat(reverse: true); }
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(animation: _anim, builder: (_, __) => Container(width: widget.width, height: widget.height, decoration: BoxDecoration(color: AppTheme.surfaceCard.withOpacity(_anim.value + 0.3), borderRadius: BorderRadius.circular(widget.radius))));
+}
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key});
   @override
@@ -396,6 +441,10 @@ class PlanScreen extends StatefulWidget {
 
 class _PlanScreenState extends State<PlanScreen> {
   int _selectedDay = 0;
+  bool _planLoading = true;
+
+  @override
+  void initState() { super.initState(); Future.delayed(const Duration(milliseconds: 1200), () { if (mounted) setState(() => _planLoading = false); }); }
   final List<WorkoutDay> _plan = [
     WorkoutDay(day: 'Пн', label: 'Понедельник', type: 'Грудь и трицепс', exercises: [Exercise(name: 'Отжимания', sets: '4 × 15', muscles: 'Грудь', icon: Icons.sports_gymnastics), Exercise(name: 'Жим гантелей лёжа', sets: '3 × 12', muscles: 'Грудь, трицепс', icon: Icons.fitness_center), Exercise(name: 'Разводка гантелей', sets: '3 × 12', muscles: 'Грудь', icon: Icons.fitness_center), Exercise(name: 'Французский жим', sets: '3 × 12', muscles: 'Трицепс', icon: Icons.fitness_center), Exercise(name: 'Отжимания на брусьях', sets: '3 × 10', muscles: 'Трицепс, грудь', icon: Icons.sports_gymnastics)]),
     WorkoutDay(day: 'Вт', label: 'Вторник', type: 'Спина и бицепс', exercises: [Exercise(name: 'Подтягивания', sets: '4 × 8', muscles: 'Спина, бицепс', icon: Icons.sports_gymnastics), Exercise(name: 'Тяга гантели в наклоне', sets: '3 × 12', muscles: 'Спина', icon: Icons.fitness_center), Exercise(name: 'Гиперэкстензия', sets: '3 × 15', muscles: 'Поясница', icon: Icons.sports_gymnastics), Exercise(name: 'Сгибания на бицепс', sets: '3 × 12', muscles: 'Бицепс', icon: Icons.fitness_center), Exercise(name: 'Молоток', sets: '3 × 12', muscles: 'Бицепс, предплечье', icon: Icons.fitness_center)]),
@@ -407,13 +456,14 @@ class _PlanScreenState extends State<PlanScreen> {
   ];
 
   @override
+  Widget _buildSkeleton() => ListView(padding: const EdgeInsets.all(16), children: [_SkeletonBox(width: double.infinity, height: 100, radius: 16), const SizedBox(height: 16), ...List.generate(4, (i) => Padding(padding: const EdgeInsets.only(bottom: 8), child: _SkeletonBox(width: double.infinity, height: 70, radius: 14)))]);
   Widget build(BuildContext context) {
     final today = _plan[_selectedDay];
     final isRest = today.exercises.isEmpty;
     final doneCount = today.exercises.where((e) => e.done).length;
     return Scaffold(
       appBar: AppBar(title: const Text('План'), actions: [Container(margin: const EdgeInsets.only(right: 16), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.15), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.primary.withOpacity(0.3))), child: const Text('Моковый план', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w600)))]),
-      body: Column(children: [
+      body: _planLoading ? _buildSkeleton() : Column(children: [
         Container(height: 72, color: AppTheme.background, child: ListView.builder(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), itemCount: _plan.length, itemBuilder: (context, i) {
           final d = _plan[i]; final selected = _selectedDay == i;
           return GestureDetector(onTap: () => setState(() => _selectedDay = i), child: AnimatedContainer(duration: const Duration(milliseconds: 200), margin: const EdgeInsets.only(right: 8), width: 52, decoration: BoxDecoration(color: selected ? AppTheme.primary : AppTheme.surfaceCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: selected ? AppTheme.primary : const Color(0xFF2E3247))),
@@ -742,7 +792,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           await prefs.setBool('onboarding_done', false);
           await NotificationService.cancel();
           if (!context.mounted) return;
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+          Navigator.pushReplacement(context, FadeRoute(page: const AuthScreen()));
         }),
       ]),
     );
