@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core/theme/app_theme.dart';
 import 'services/notification_service.dart';
-import 'features/auth/screens/auth_screen.dart';
+import 'features/splash/screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,7 +32,7 @@ class VexorApp extends StatelessWidget {
       title: 'Vexor',
       theme: AppTheme.dark,
       debugShowCheckedModeBanner: false,
-      home: const AuthScreen(),
+      home: const SplashScreen(),
     );
   }
 }
