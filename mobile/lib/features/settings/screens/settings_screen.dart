@@ -19,6 +19,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = false;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 9, minute: 0);
+  static const _appVersion = '1.0.0';
 
   @override
   void initState() {
@@ -70,7 +71,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (picked == null || !mounted) return;
-
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('reminder_hour', picked.hour);
     await prefs.setInt('reminder_minute', picked.minute);
@@ -103,48 +103,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.surfaceCard,
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withOpacity(0.12),
+                  AppColors.surfaceCard,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withOpacity(0.2)),
             ),
             child: Row(
               children: [
                 const VexorLogo(size: 52),
                 const SizedBox(width: 14),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Vexor',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Vexor',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
                       ),
-                    ),
-                    const Text(
-                      'Бесплатный план',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Бесплатный план',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // Уведомления
-          const Text(
-            'УВЕДОМЛЕНИЯ',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1,
-            ),
-          ),
+          _SectionHeader(title: 'УВЕДОМЛЕНИЯ'),
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
@@ -164,11 +177,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   subtitle: const Text(
                     'Ежедневное уведомление',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   secondary: Container(
-                    width: 36,
-                    height: 36,
+                    width: 36, height: 36,
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
@@ -182,19 +197,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: _notificationsEnabled,
                   onChanged: _toggleNotifications,
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
+                    horizontal: 16, vertical: 4,
                   ),
                 ),
                 if (_notificationsEnabled) ...[
-                  Divider(
-                    color: Colors.white.withOpacity(0.05),
-                    height: 1,
-                  ),
+                  Divider(color: Colors.white.withOpacity(0.05), height: 1),
                   ListTile(
                     leading: Container(
-                      width: 36,
-                      height: 36,
+                      width: 36, height: 36,
                       decoration: BoxDecoration(
                         color: AppColors.warning.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(10),
@@ -217,8 +227,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: _pickTime,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
+                          horizontal: 14, vertical: 8,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withOpacity(0.15),
@@ -238,30 +247,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
+                      horizontal: 16, vertical: 4,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // Аккаунт
-          const Text(
-            'АККАУНТ',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1,
-            ),
-          ),
+          _SectionHeader(title: 'АККАУНТ'),
           const SizedBox(height: 8),
           _SettingsTile(
             icon: Icons.workspace_premium_outlined,
             label: 'Подписка Premium',
+            subtitle: 'Безлимитный AI-чат и персональный план',
             color: AppColors.warning,
             onTap: () {},
           ),
@@ -271,7 +272,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.danger,
             onTap: _logout,
           ),
+          const SizedBox(height: 24),
+
+          // О приложении
+          _SectionHeader(title: 'О ПРИЛОЖЕНИИ'),
+          const SizedBox(height: 8),
+          _SettingsTile(
+            icon: Icons.shield_outlined,
+            label: 'Политика конфиденциальности',
+            color: AppColors.textSecondary,
+            onTap: () {},
+          ),
+          _SettingsTile(
+            icon: Icons.description_outlined,
+            label: 'Условия использования',
+            color: AppColors.textSecondary,
+            onTap: () {},
+          ),
+          const SizedBox(height: 16),
+
+          // Версия
+          Center(
+            child: Column(
+              children: [
+                const VexorLogo(size: 32),
+                const SizedBox(height: 8),
+                Text(
+                  'Vexor v$_appVersion',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Приложение не заменяет консультацию врача',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1,
       ),
     );
   }
@@ -280,12 +343,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String? subtitle;
   final Color color;
   final VoidCallback? onTap;
 
   const _SettingsTile({
     required this.icon,
     required this.label,
+    this.subtitle,
     required this.color,
     this.onTap,
   });
@@ -300,8 +365,7 @@ class _SettingsTile extends StatelessWidget {
       ),
       child: ListTile(
         leading: Container(
-          width: 36,
-          height: 36,
+          width: 36, height: 36,
           decoration: BoxDecoration(
             color: color.withOpacity(0.15),
             borderRadius: BorderRadius.circular(10),
@@ -316,12 +380,22 @@ class _SettingsTile extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
+        subtitle: subtitle != null
+            ? Text(
+                subtitle!,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                ),
+              )
+            : null,
         trailing: const Icon(
           Icons.chevron_right,
           color: AppColors.textSecondary,
           size: 18,
         ),
         onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
     );
   }

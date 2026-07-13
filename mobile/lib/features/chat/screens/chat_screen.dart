@@ -24,6 +24,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   bool _isWaiting = false;
 
+  // Быстрые подсказки для пустого состояния
+  static const _suggestions = [
+    '💪 Как правильно делать приседания?',
+    '🔥 Составь план на похудение',
+    '😴 Болит спина после тренировки',
+    '🍎 Что съесть перед тренировкой?',
+  ];
+
   @override
   void dispose() {
     _controller.dispose();
@@ -43,18 +51,18 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _sendMessage() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
+  Future<void> _sendMessage([String? text]) async {
+    final message = (text ?? _controller.text).trim();
+    if (message.isEmpty) return;
 
     setState(() {
-      _messages.add(ChatMessage.user(text));
+      _messages.add(ChatMessage.user(message));
       _isWaiting = true;
     });
     _controller.clear();
     _scrollToBottom();
 
-    final result = await ApiClient.instance.sendMessage(text);
+    final result = await ApiClient.instance.sendMessage(message);
 
     if (!mounted) return;
     setState(() => _isWaiting = false);
@@ -63,19 +71,87 @@ class _ChatScreenState extends State<ChatScreen> {
       case ApiSuccess(:final data):
         final reply = data['reply'] as String? ?? 'Нет ответа';
         setState(() => _messages.add(ChatMessage.assistant(reply)));
-      case ApiError(:final message):
-        // Если API недоступен — показываем мок ответ для демонстрации
+      case ApiError():
         setState(() => _messages.add(
               ChatMessage.assistant(
                 'Это тестовый ответ. Скоро здесь будет настоящий AI-тренер 🤖',
               ),
             ));
         if (ApiClient.instance.isAuthenticated) {
-          SnackbarHelper.showError(context, message);
+          SnackbarHelper.showError(context, 'Нет соединения с сервером');
         }
     }
 
     _scrollToBottom();
+  }
+
+  Widget _buildSuggestions() {
+    return Column(
+      children: [
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.tips_and_updates_outlined,
+                        color: AppColors.primary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Попробуй спросить',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ..._suggestions.map(
+                (s) => GestureDetector(
+                  onTap: () => _sendMessage(s),
+                  child: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      s,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildMessage(ChatMessage msg) {
@@ -88,17 +164,13 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           if (msg.isAssistant) ...[
             Container(
-              width: 28,
-              height: 28,
+              width: 28, height: 28,
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.smart_toy_outlined,
-                color: AppColors.primary,
-                size: 16,
-              ),
+              child: const Icon(Icons.smart_toy_outlined,
+                  color: AppColors.primary, size: 16),
             ),
             const SizedBox(width: 8),
           ],
@@ -130,24 +202,58 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.smart_toy_outlined,
+                color: AppColors.primary, size: 16),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceCard,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+                bottomLeft: Radius.circular(4),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(3, (i) => _Dot(delay: i * 200)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showSuggestions = _messages.length == 1;
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 36, height: 36,
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
-                Icons.smart_toy_outlined,
-                color: AppColors.primary,
-                size: 20,
-              ),
+              child: const Icon(Icons.smart_toy_outlined,
+                  color: AppColors.primary, size: 20),
             ),
             const SizedBox(width: 10),
             Column(
@@ -176,11 +282,14 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
+            child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (_, i) => _buildMessage(_messages[i]),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              children: [
+                ..._messages.map(_buildMessage),
+                if (_isWaiting) _buildTypingIndicator(),
+                if (showSuggestions) _buildSuggestions(),
+              ],
             ),
           ),
           Container(
@@ -198,6 +307,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: TextField(
                       controller: _controller,
                       style: const TextStyle(color: AppColors.textPrimary),
+                      maxLines: null,
+                      textCapitalization: TextCapitalization.sentences,
                       decoration: const InputDecoration(
                         hintText: 'Напиши тренеру...',
                       ),
@@ -208,17 +319,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   GestureDetector(
                     onTap: _sendMessage,
                     child: Container(
-                      width: 44,
-                      height: 44,
+                      width: 44, height: 44,
                       decoration: BoxDecoration(
                         color: AppColors.primary,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
-                        Icons.send_rounded,
-                        color: Colors.black,
-                        size: 20,
-                      ),
+                      child: const Icon(Icons.send_rounded,
+                          color: Colors.black, size: 20),
                     ),
                   ),
                 ],
@@ -226,6 +333,58 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Анимированная точка для индикатора печатания
+class _Dot extends StatefulWidget {
+  final int delay;
+  const _Dot({required this.delay});
+
+  @override
+  State<_Dot> createState() => _DotState();
+}
+
+class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) _ctrl.repeat(reverse: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: FadeTransition(
+        opacity: _anim,
+        child: Container(
+          width: 6, height: 6,
+          decoration: const BoxDecoration(
+            color: AppColors.textSecondary,
+            shape: BoxShape.circle,
+          ),
+        ),
       ),
     );
   }
