@@ -8,6 +8,7 @@ import '../../../core/widgets/vexor_logo.dart';
 import '../../../services/api_client.dart';
 import '../../../services/notification_service.dart';
 import '../../auth/screens/auth_screen.dart';
+import '../../profile/screens/profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -100,7 +101,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // Профиль
-          Container(
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              FadeRoute(page: const ProfileScreen()),
+            ),
+            child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -151,7 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
+                const Icon(Icons.chevron_right, color: AppColors.textSecondary),
               ],
+            ),
             ),
           ),
           const SizedBox(height: 24),
