@@ -15,18 +15,41 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  final List<ProgressEntry> _entries = [
-    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 10)), weightKg: 81.0, workoutCompleted: true),
-    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 8)), weightKg: 80.5, workoutCompleted: true),
-    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 6)), weightKg: 80.2, workoutCompleted: false),
-    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 4)), weightKg: 80.0, workoutCompleted: true),
-    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 2)), weightKg: 79.5, workoutCompleted: true),
-    ProgressEntry(date: DateTime.now().subtract(const Duration(days: 1)), weightKg: 79.2, workoutCompleted: false),
-  ];
+  List<ProgressEntry> _entries = [];
+  bool _isLoadingEntries = true;
 
   final _weightController = TextEditingController();
   bool _workoutDone = true;
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEntries();
+  }
+
+  Future<void> _loadEntries() async {
+    final stored = await ProgressStorage.load();
+    if (!mounted) return;
+    setState(() {
+      // Если локально пока пусто (первый запуск) — подставляем демо-данные,
+      // чтобы график не выглядел пустым для нового пользователя.
+      _entries = stored.isNotEmpty ? stored : _demoEntries();
+      _isLoadingEntries = false;
+    });
+    if (stored.isEmpty) {
+      await ProgressStorage.saveAll(_entries);
+    }
+  }
+
+  List<ProgressEntry> _demoEntries() => [
+        ProgressEntry(date: DateTime.now().subtract(const Duration(days: 10)), weightKg: 81.0, workoutCompleted: true),
+        ProgressEntry(date: DateTime.now().subtract(const Duration(days: 8)), weightKg: 80.5, workoutCompleted: true),
+        ProgressEntry(date: DateTime.now().subtract(const Duration(days: 6)), weightKg: 80.2, workoutCompleted: false),
+        ProgressEntry(date: DateTime.now().subtract(const Duration(days: 4)), weightKg: 80.0, workoutCompleted: true),
+        ProgressEntry(date: DateTime.now().subtract(const Duration(days: 2)), weightKg: 79.5, workoutCompleted: true),
+        ProgressEntry(date: DateTime.now().subtract(const Duration(days: 1)), weightKg: 79.2, workoutCompleted: false),
+      ];
 
   @override
   void dispose() {
@@ -38,6 +61,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final weight = double.tryParse(_weightController.text.replaceAll(',', '.'));
     setState(() => _isSaving = true);
 
+    final newEntry = ProgressEntry(
+      date: DateTime.now(),
+      weightKg: weight,
+      workoutCompleted: _workoutDone,
+    );
+
+    // Локальная копия — источник правды всегда, независимо от бэкенда.
+    final updated = [..._entries, newEntry];
+    await ProgressStorage.saveAll(updated);
+
+    // Бэкенд вызывается best-effort: если недоступен, ничего не теряем.
     final result = await ApiClient.instance.logProgress(
       date: DateTime.now().toIso8601String().split('T').first,
       weightKg: weight ?? 0,
@@ -45,32 +79,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
 
     if (!mounted) return;
-    setState(() => _isSaving = false);
+    setState(() {
+      _isSaving = false;
+      _entries = updated;
+      _weightController.clear();
+      _workoutDone = true;
+    });
 
     switch (result) {
       case ApiSuccess():
-        setState(() {
-          _entries.add(ProgressEntry(
-            date: DateTime.now(),
-            weightKg: weight,
-            workoutCompleted: _workoutDone,
-          ));
-          _weightController.clear();
-          _workoutDone = true;
-        });
         if (mounted) Navigator.pop(context);
         if (mounted) SnackbarHelper.showSuccess(context, 'Запись сохранена');
       case ApiError():
-        // Сохраняем локально если API недоступен
-        setState(() {
-          _entries.add(ProgressEntry(
-            date: DateTime.now(),
-            weightKg: weight,
-            workoutCompleted: _workoutDone,
-          ));
-          _weightController.clear();
-          _workoutDone = true;
-        });
         if (mounted) Navigator.pop(context);
     }
   }
@@ -162,6 +182,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingEntries) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
     final completed = _entries.where((e) => e.workoutCompleted).length;
     final weights = _entries.where((e) => e.weightKg != null).toList();
     final weightValues = weights.map((e) => e.weightKg!).toList();
