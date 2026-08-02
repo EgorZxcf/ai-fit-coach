@@ -3,27 +3,66 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Замеры тела в рамках одной записи прогресса — все поля опциональны,
+/// пользователь заполняет только то, что измерил.
+final class BodyMeasurements {
+  final double? waistCm;
+  final double? chestCm;
+  final double? hipsCm;
+  final double? bicepCm;
+
+  const BodyMeasurements({
+    this.waistCm,
+    this.chestCm,
+    this.hipsCm,
+    this.bicepCm,
+  });
+
+  bool get isEmpty =>
+      waistCm == null && chestCm == null && hipsCm == null && bicepCm == null;
+
+  factory BodyMeasurements.fromJson(Map<String, dynamic> json) => BodyMeasurements(
+        waistCm: (json['waist_cm'] as num?)?.toDouble(),
+        chestCm: (json['chest_cm'] as num?)?.toDouble(),
+        hipsCm: (json['hips_cm'] as num?)?.toDouble(),
+        bicepCm: (json['bicep_cm'] as num?)?.toDouble(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'waist_cm': waistCm,
+        'chest_cm': chestCm,
+        'hips_cm': hipsCm,
+        'bicep_cm': bicepCm,
+      };
+}
+
 /// Модель одной записи прогресса пользователя.
 final class ProgressEntry {
   final DateTime date;
   final double? weightKg;
   final bool workoutCompleted;
   final String? photoPath;
+  final BodyMeasurements? measurements;
 
   const ProgressEntry({
     required this.date,
     this.weightKg,
     required this.workoutCompleted,
     this.photoPath,
+    this.measurements,
   });
 
   bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
+  bool get hasMeasurements => measurements != null && !measurements!.isEmpty;
 
   factory ProgressEntry.fromJson(Map<String, dynamic> json) => ProgressEntry(
         date: DateTime.parse(json['date'] as String),
         weightKg: (json['weight_kg'] as num?)?.toDouble(),
         workoutCompleted: json['workout_completed'] as bool,
         photoPath: json['photo_path'] as String?,
+        measurements: json['measurements'] != null
+            ? BodyMeasurements.fromJson(json['measurements'] as Map<String, dynamic>)
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -31,6 +70,7 @@ final class ProgressEntry {
         'weight_kg': weightKg,
         'workout_completed': workoutCompleted,
         'photo_path': photoPath,
+        'measurements': measurements?.toJson(),
       };
 }
 

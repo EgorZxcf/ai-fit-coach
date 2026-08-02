@@ -22,8 +22,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
   bool _isLoadingEntries = true;
 
   final _weightController = TextEditingController();
+  final _waistController = TextEditingController();
+  final _chestController = TextEditingController();
+  final _hipsController = TextEditingController();
+  final _bicepController = TextEditingController();
   bool _workoutDone = true;
   bool _isSaving = false;
+  bool _showMeasurements = false;
   XFile? _pickedPhoto;
 
   @override
@@ -58,6 +63,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
   @override
   void dispose() {
     _weightController.dispose();
+    _waistController.dispose();
+    _chestController.dispose();
+    _hipsController.dispose();
+    _bicepController.dispose();
     super.dispose();
   }
 
@@ -111,11 +120,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
       savedPhotoPath = await ProgressPhotoService.persist(_pickedPhoto!.path);
     }
 
+    double? parse(TextEditingController c) =>
+        double.tryParse(c.text.replaceAll(',', '.'));
+
+    final measurements = BodyMeasurements(
+      waistCm: parse(_waistController),
+      chestCm: parse(_chestController),
+      hipsCm: parse(_hipsController),
+      bicepCm: parse(_bicepController),
+    );
+
     final newEntry = ProgressEntry(
       date: DateTime.now(),
       weightKg: weight,
       workoutCompleted: _workoutDone,
       photoPath: savedPhotoPath,
+      measurements: measurements.isEmpty ? null : measurements,
     );
 
     // Локальная копия — источник правды всегда, независимо от бэкенда.
@@ -134,8 +154,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
       _isSaving = false;
       _entries = updated;
       _weightController.clear();
+      _waistController.clear();
+      _chestController.clear();
+      _hipsController.clear();
+      _bicepController.clear();
       _workoutDone = true;
       _pickedPhoto = null;
+      _showMeasurements = false;
     });
 
     switch (result) {
@@ -215,6 +240,80 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
               ),
+              const SizedBox(height: 12),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setS(() => _showMeasurements = !_showMeasurements),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceCard,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.straighten, color: AppColors.textSecondary, size: 18),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Замеры тела (опционально)',
+                          style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                        ),
+                      ),
+                      Icon(
+                        _showMeasurements ? Icons.expand_less : Icons.expand_more,
+                        color: AppColors.textSecondary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_showMeasurements) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _waistController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: const InputDecoration(labelText: 'Талия', suffixText: 'см'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _chestController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: const InputDecoration(labelText: 'Грудь', suffixText: 'см'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _hipsController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: const InputDecoration(labelText: 'Бёдра', suffixText: 'см'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _bicepController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        decoration: const InputDecoration(labelText: 'Бицепс', suffixText: 'см'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               GestureDetector(
                 onTap: () => _pickPhoto(setS),
@@ -297,6 +396,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return '${d.day}.${d.month.toString().padLeft(2, '0')}';
   }
 
+  List<MapEntry<DateTime, double>> _measurementSeries(
+    double? Function(BodyMeasurements) getter,
+  ) {
+    return _entries
+        .where((e) => e.measurements != null && getter(e.measurements!) != null)
+        .map((e) => MapEntry(e.date, getter(e.measurements!)!))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingEntries) {
@@ -312,6 +420,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
         ? weightValues.last - weightValues.first
         : null;
     final photoEntries = _entries.where((e) => e.hasPhoto).toList();
+    final waistSeries = _measurementSeries((m) => m.waistCm);
+    final chestSeries = _measurementSeries((m) => m.chestCm);
+    final hipsSeries = _measurementSeries((m) => m.hipsCm);
+    final bicepSeries = _measurementSeries((m) => m.bicepCm);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Прогресс')),
@@ -410,6 +522,33 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 },
               ),
             ),
+          ],
+          if ([waistSeries, chestSeries, hipsSeries, bicepSeries].any((s) => s.length >= 2)) ...[
+            const SizedBox(height: 24),
+            const Text(
+              'Замеры тела',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (waistSeries.length >= 2) ...[
+              _MetricChart(title: 'Талия', unit: 'см', series: waistSeries),
+              const SizedBox(height: 12),
+            ],
+            if (chestSeries.length >= 2) ...[
+              _MetricChart(title: 'Грудь', unit: 'см', series: chestSeries),
+              const SizedBox(height: 12),
+            ],
+            if (hipsSeries.length >= 2) ...[
+              _MetricChart(title: 'Бёдра', unit: 'см', series: hipsSeries),
+              const SizedBox(height: 12),
+            ],
+            if (bicepSeries.length >= 2) ...[
+              _MetricChart(title: 'Бицепс', unit: 'см', series: bicepSeries),
+            ],
           ],
           const SizedBox(height: 24),
           const Text(
@@ -561,6 +700,62 @@ class _StatCard extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricChart extends StatelessWidget {
+  final String title;
+  final String unit;
+  final List<MapEntry<DateTime, double>> series;
+
+  const _MetricChart({required this.title, required this.unit, required this.series});
+
+  @override
+  Widget build(BuildContext context) {
+    final values = series.map((e) => e.value).toList();
+    final delta = values.last - values.first;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)} $unit',
+                style: TextStyle(
+                  color: delta <= 0 ? AppColors.primary : AppColors.danger,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 70,
+            child: CustomPaint(
+              painter: _WeightChartPainter(weights: values),
+              size: const Size(double.infinity, 70),
+            ),
           ),
         ],
       ),
