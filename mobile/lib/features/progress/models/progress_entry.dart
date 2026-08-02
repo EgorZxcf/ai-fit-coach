@@ -8,23 +8,29 @@ final class ProgressEntry {
   final DateTime date;
   final double? weightKg;
   final bool workoutCompleted;
+  final String? photoPath;
 
   const ProgressEntry({
     required this.date,
     this.weightKg,
     required this.workoutCompleted,
+    this.photoPath,
   });
+
+  bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
 
   factory ProgressEntry.fromJson(Map<String, dynamic> json) => ProgressEntry(
         date: DateTime.parse(json['date'] as String),
         weightKg: (json['weight_kg'] as num?)?.toDouble(),
         workoutCompleted: json['workout_completed'] as bool,
+        photoPath: json['photo_path'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
         'date': date.toIso8601String(),
         'weight_kg': weightKg,
         'workout_completed': workoutCompleted,
+        'photo_path': photoPath,
       };
 }
 

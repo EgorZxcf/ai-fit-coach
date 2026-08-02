@@ -1,11 +1,14 @@
 // mobile/lib/features/progress/screens/progress_screen.dart
 
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/snackbar_helper.dart';
 import '../../../services/api_client.dart';
 import '../models/progress_entry.dart';
+import '../services/progress_photo_service.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -21,6 +24,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   final _weightController = TextEditingController();
   bool _workoutDone = true;
   bool _isSaving = false;
+  XFile? _pickedPhoto;
 
   @override
   void initState() {
@@ -57,14 +61,61 @@ class _ProgressScreenState extends State<ProgressScreen> {
     super.dispose();
   }
 
+  Future<void> _pickPhoto(void Function(void Function()) setS) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined, color: AppColors.primary),
+              title: const Text('Сделать фото', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined, color: AppColors.primary),
+              title: const Text('Выбрать из галереи', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    try {
+      final picker = ImagePicker();
+      final photo = await picker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+      if (photo != null) {
+        setS(() => _pickedPhoto = photo);
+      }
+    } catch (_) {
+      if (mounted) SnackbarHelper.showError(context, 'Не удалось получить доступ к фото');
+    }
+  }
+
   Future<void> _addEntry() async {
     final weight = double.tryParse(_weightController.text.replaceAll(',', '.'));
     setState(() => _isSaving = true);
+
+    String? savedPhotoPath;
+    if (_pickedPhoto != null) {
+      savedPhotoPath = await ProgressPhotoService.persist(_pickedPhoto!.path);
+    }
 
     final newEntry = ProgressEntry(
       date: DateTime.now(),
       weightKg: weight,
       workoutCompleted: _workoutDone,
+      photoPath: savedPhotoPath,
     );
 
     // Локальная копия — источник правды всегда, независимо от бэкенда.
@@ -84,6 +135,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       _entries = updated;
       _weightController.clear();
       _workoutDone = true;
+      _pickedPhoto = null;
     });
 
     switch (result) {
@@ -92,6 +144,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         if (mounted) SnackbarHelper.showSuccess(context, 'Запись сохранена');
       case ApiError():
         if (mounted) Navigator.pop(context);
+        if (mounted) SnackbarHelper.showSuccess(context, 'Запись сохранена локально');
     }
   }
 
@@ -162,6 +215,56 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
               ),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () => _pickPhoto(setS),
+                child: Container(
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: _pickedPhoto == null
+                      ? const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_a_photo_outlined, color: AppColors.textSecondary),
+                              SizedBox(height: 6),
+                              Text(
+                                'Добавить фото прогресса',
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(File(_pickedPhoto!.path), fit: BoxFit.cover),
+                            ),
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: GestureDetector(
+                                onTap: () => setS(() => _pickedPhoto = null),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
               const SizedBox(height: 16),
               _isSaving
                   ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -170,6 +273,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _openPhotoViewer(ProgressEntry entry) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => _PhotoViewerScreen(entry: entry)),
+    );
+  }
+
+  void _openCompareView(List<ProgressEntry> photoEntries) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => _PhotoCompareScreen(entries: photoEntries)),
     );
   }
 
@@ -194,6 +311,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final weightDelta = weightValues.length >= 2
         ? weightValues.last - weightValues.first
         : null;
+    final photoEntries = _entries.where((e) => e.hasPhoto).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Прогресс')),
@@ -239,6 +357,60 @@ class _ProgressScreenState extends State<ProgressScreen> {
             const SizedBox(height: 16),
             _WeightChart(entries: weights, weightValues: weightValues),
           ],
+          if (photoEntries.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Фото-прогресс',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (photoEntries.length >= 2)
+                  TextButton(
+                    onPressed: () => _openCompareView(photoEntries),
+                    child: const Text('До / После', style: TextStyle(color: AppColors.primary)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 96,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: photoEntries.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (ctx, i) {
+                  final entry = photoEntries[photoEntries.length - 1 - i];
+                  return GestureDetector(
+                    onTap: () => _openPhotoViewer(entry),
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            File(entry.photoPath!),
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(entry.date),
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           const Text(
             'История',
@@ -264,23 +436,37 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: e.workoutCompleted
-                          ? AppColors.primary.withOpacity(0.15)
-                          : AppColors.textSecondary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
+                  if (e.hasPhoto)
+                    GestureDetector(
+                      onTap: () => _openPhotoViewer(e),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(
+                          File(e.photoPath!),
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: e.workoutCompleted
+                            ? AppColors.primary.withOpacity(0.15)
+                            : AppColors.textSecondary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        e.workoutCompleted ? Icons.check : Icons.close,
+                        color: e.workoutCompleted
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                        size: 20,
+                      ),
                     ),
-                    child: Icon(
-                      e.workoutCompleted ? Icons.check : Icons.close,
-                      color: e.workoutCompleted
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
-                      size: 20,
-                    ),
-                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -518,4 +704,169 @@ class _WeightChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_WeightChartPainter old) => old.weights != weights;
+}
+
+/// Полноэкранный просмотр одного фото прогресса с возможностью зума.
+class _PhotoViewerScreen extends StatelessWidget {
+  final ProgressEntry entry;
+
+  const _PhotoViewerScreen({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final d = entry.date;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: Text('${d.day}.${d.month.toString().padLeft(2, '0')}.${d.year}'),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 0.8,
+          maxScale: 4,
+          child: Image.file(File(entry.photoPath!)),
+        ),
+      ),
+    );
+  }
+}
+
+/// Сравнение первого и последнего фото прогресса бок о бок.
+class _PhotoCompareScreen extends StatefulWidget {
+  final List<ProgressEntry> entries;
+
+  const _PhotoCompareScreen({required this.entries});
+
+  @override
+  State<_PhotoCompareScreen> createState() => _PhotoCompareScreenState();
+}
+
+class _PhotoCompareScreenState extends State<_PhotoCompareScreen> {
+  late int _beforeIndex;
+  late int _afterIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _beforeIndex = 0;
+    _afterIndex = widget.entries.length - 1;
+  }
+
+  String _label(DateTime d) => '${d.day}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    final before = widget.entries[_beforeIndex];
+    final after = widget.entries[_afterIndex];
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('До / После')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(child: _ComparePane(entry: before, label: 'До · ${_label(before.date)}')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _ComparePane(entry: after, label: 'После · ${_label(after.date)}')),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _PhotoDropdown(
+                    label: 'До',
+                    entries: widget.entries,
+                    value: _beforeIndex,
+                    onChanged: (v) => setState(() => _beforeIndex = v),
+                    formatLabel: _label,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _PhotoDropdown(
+                    label: 'После',
+                    entries: widget.entries,
+                    value: _afterIndex,
+                    onChanged: (v) => setState(() => _afterIndex = v),
+                    formatLabel: _label,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ComparePane extends StatelessWidget {
+  final ProgressEntry entry;
+  final String label;
+
+  const _ComparePane({required this.entry, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.file(File(entry.photoPath!), fit: BoxFit.cover, width: double.infinity),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+      ],
+    );
+  }
+}
+
+class _PhotoDropdown extends StatelessWidget {
+  final String label;
+  final List<ProgressEntry> entries;
+  final int value;
+  final ValueChanged<int> onChanged;
+  final String Function(DateTime) formatLabel;
+
+  const _PhotoDropdown({
+    required this.label,
+    required this.entries,
+    required this.value,
+    required this.onChanged,
+    required this.formatLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          isExpanded: true,
+          value: value,
+          dropdownColor: AppColors.surfaceCard,
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          items: [
+            for (int i = 0; i < entries.length; i++)
+              DropdownMenuItem(value: i, child: Text(formatLabel(entries[i].date))),
+          ],
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ),
+    );
+  }
 }
