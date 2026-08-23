@@ -10,6 +10,10 @@ abstract final class ApiConstants {
   static const String register = '/register';
   static const String login = '/login';
 
+  // Onboarding
+  static const String onboarding = '/users/onboarding';
+  static const String pushToken = '/users/push-token';
+
   // Plan
   static const String generatePlan = '/plans/generate';
   static const String currentPlan = '/plans/current';

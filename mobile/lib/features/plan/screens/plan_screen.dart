@@ -6,6 +6,7 @@ import '../../../core/widgets/skeleton_box.dart';
 import '../../../core/widgets/rest_timer.dart';
 import '../models/exercise.dart';
 import '../models/workout_day.dart';
+import '../../../services/api_client.dart';
 
 class PlanScreen extends StatefulWidget {
   const PlanScreen({super.key});
@@ -19,7 +20,8 @@ class _PlanScreenState extends State<PlanScreen> {
   bool _isLoading = true;
   int _restSeconds = 90;
 
-  final List<WorkoutDay> _plan = [
+  // Дефолт на время загрузки / фолбэк, если бэкенд ещё не отдаёт план.
+  List<WorkoutDay> _plan = [
     WorkoutDay(day: 'Пн', label: 'Понедельник', type: 'Грудь и трицепс', exercises: [
       Exercise(name: 'Отжимания', sets: '4 × 15', muscles: 'Грудь', icon: Icons.sports_gymnastics),
       Exercise(name: 'Жим гантелей лёжа', sets: '3 × 12', muscles: 'Грудь, трицепс', icon: Icons.fitness_center),
@@ -60,9 +62,31 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) setState(() => _isLoading = false);
-    });
+    _loadPlan();
+  }
+
+  /// Пытается получить реальный план с бэкенда. Если эндпоинт ещё не
+  /// задеплоен, вернул ошибку или пустой список — остаёмся на моках,
+  /// чтобы экран всегда оставался рабочим.
+  Future<void> _loadPlan() async {
+    final result = await ApiClient.instance.getCurrentPlan();
+    if (!mounted) return;
+
+    if (result is ApiSuccess<Map<String, dynamic>>) {
+      final days = WorkoutDay.listFromJson(result.data);
+      if (days.isNotEmpty) {
+        setState(() {
+          _plan = days;
+          _isLoading = false;
+        });
+        return;
+      }
+    }
+
+    // Нет плана с бэкенда (403/404/сеть недоступна) — короткая пауза
+    // для skeleton-анимации и остаёмся на моковых данных.
+    await Future.delayed(const Duration(milliseconds: 1200));
+    if (mounted) setState(() => _isLoading = false);
   }
 
   void _onExerciseTap(Exercise ex) {

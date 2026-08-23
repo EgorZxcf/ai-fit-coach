@@ -17,4 +17,20 @@ final class Exercise {
     required this.icon,
     this.done = false,
   });
+
+  /// Парсинг из ответа бэкенда: `{ "name": "Squats", "sets": 3, "reps": 12 }`.
+  /// Бэкенд не отдаёт мышечную группу и иконку — используем дефолты.
+  factory Exercise.fromJson(Map<String, dynamic> json) {
+    final sets = json['sets'];
+    final reps = json['reps'];
+    final setsLabel = (sets != null && reps != null)
+        ? '$sets × $reps'
+        : (json['sets_label']?.toString() ?? '');
+    return Exercise(
+      name: json['name']?.toString() ?? '',
+      sets: setsLabel,
+      muscles: json['muscles']?.toString() ?? '',
+      icon: Icons.fitness_center,
+    );
+  }
 }

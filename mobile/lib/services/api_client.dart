@@ -119,9 +119,54 @@ final class ApiClient {
     String password,
   ) => _post(ApiConstants.login, {'email': email, 'password': password});
 
+  // Onboarding
+  Future<ApiResult<Map<String, dynamic>>> submitOnboarding({
+    required String goal,
+    required String level,
+    required List<String> equipment,
+    String? restrictions,
+  }) => _post(ApiConstants.onboarding, {
+        'goal': goal,
+        'level': level,
+        'equipment': equipment,
+        if (restrictions != null && restrictions.isNotEmpty)
+          'restrictions': restrictions,
+      });
+
+  Future<ApiResult<Map<String, dynamic>>> registerPushToken(String token) =>
+      _post(ApiConstants.pushToken, {'push_token': token});
+
+  // Plan
+  Future<ApiResult<Map<String, dynamic>>> generatePlan() =>
+      _post(ApiConstants.generatePlan, {});
+
+  Future<ApiResult<Map<String, dynamic>>> getCurrentPlan() =>
+      _get(ApiConstants.currentPlan);
+
   // Chat
   Future<ApiResult<Map<String, dynamic>>> sendMessage(String message) =>
       _post(ApiConstants.chatMessage, {'message': message});
+
+  Future<ApiResult<Map<String, dynamic>>> getChatHistory({
+    int limit = 50,
+    String? before,
+  }) {
+    final query = StringBuffer('?limit=$limit');
+    if (before != null) query.write('&before=$before');
+    return _get('${ApiConstants.chatHistory}$query');
+  }
+
+  // Billing
+  Future<ApiResult<Map<String, dynamic>>> verifyPurchase({
+    required String purchaseToken,
+    required String productId,
+  }) => _post(ApiConstants.billingVerify, {
+        'purchase_token': purchaseToken,
+        'product_id': productId,
+      });
+
+  Future<ApiResult<Map<String, dynamic>>> getBillingStatus() =>
+      _get(ApiConstants.billingStatus);
 
   // Progress
   Future<ApiResult<Map<String, dynamic>>> logProgress({

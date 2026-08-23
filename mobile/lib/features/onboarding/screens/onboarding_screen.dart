@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/navigation/fade_route.dart';
 import '../../../core/widgets/vexor_logo.dart';
 import '../../../root_screen.dart';
+import '../../../services/api_client.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -59,7 +60,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await prefs.setStringList('equipment', _selectedEquipment.toList());
     await prefs.setString('restrictions', _restrictionsController.text.trim());
 
-    // TODO: отправить на POST /users/onboarding когда эндпоинт будет готов
+    // Локальное сохранение — источник правды для оффлайна, поэтому
+    // онбординг не блокируется и не падает, если бэкенд ещё не ответил
+    // (эндпоинт может быть не задеплоен или сеть недоступна).
+    try {
+      await ApiClient.instance.submitOnboarding(
+        goal: _selectedGoal!,
+        level: _selectedLevel!,
+        equipment: _selectedEquipment.toList(),
+        restrictions: _restrictionsController.text.trim(),
+      );
+    } catch (_) {
+      // Бэкенд недоступен — не страшно, профиль уже сохранён локально.
+    }
 
     if (!mounted) return;
     Navigator.pushReplacement(context, FadeRoute(page: const RootScreen()));
